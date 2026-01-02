@@ -26,9 +26,13 @@ Submarine is designed to assist in the translation process by providing validati
 # submarine validate [VALID-FILE.srt] [FILE-FOR-VALIDATION.srt]
 submarine validate [--llm] [VALID-FILE.srt] [TARGET.srt]
 
-# Replace text by index
-# submarine replace [FILE.srt] [INDEX] "[NEW-TEXT]"
-submarine replace [FILE.srt] [INDEX] "[NEW-TEXT]"
+# Add subtitle
+# submarine add [FILE.srt] "[NEW-SUBTITLE]"
+submarine add [FILE.srt] "[NEW-SUBTITLE]"
+
+# Set subtitle for index
+# submarine set [FILE.srt] [INDEX] "[SUBTITLE]"
+submarine set [FILE.srt] [INDEX] "[SUBTITLE]"
 ```
 
 ## Usage with LLM agent
@@ -37,5 +41,6 @@ Put `submarine` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or 
 
 ## RoadMap
 
-- Feature: edit by offset
+- Feature: add a new subtitle
+- Feature: set subtitle by offset
 - Feature: mass-rename
