@@ -6,9 +6,9 @@ Submarine is a tiny toolkit for LLM translation assistance.
 
 ## Motivation
 
-I always watch movies, cartoons and anime with original audio. However, quite often subtitles aren't available on my language. Nowadays we have large language models (LLMs) that can help us translate subtitles. But they are not perfect and sometimes they make mistakes, put wrong subtitle numbers, timestamps, etc. Even best ones make mistakes.
+I always watch content in its original language, but subtitles aren't always available in my native tongue. LLMs can help with translation, but they often introduce errors in formatting, timestamps, or numbering.
 
-Submarine is designed to assist in the translation process by providing various edit and validation tools. It helps ensure that the translated subtitles are accurate and consistent with the original content.
+Submarine is a tool designed to refine this process. It provides editing and validation features to ensure that LLM-generated subtitles are accurate, consistent, and correctly formatted.
 
 ## Features
 
