@@ -43,7 +43,7 @@ sm add [FILE.srt] "[NEW-SUBTITLE]"
 sm validate [--llm] [VALID-FILE.srt] [TARGET.srt]
 
 # Mass rename
-sm rename [--name="Resident Alien"] \
+sm mass-rename [--name="Resident Alien"] \
           [--series-mode] [--season=3] [--episodes=8] \
           [--language="ru"] \
           [--separator="."] \
