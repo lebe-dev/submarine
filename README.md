@@ -12,6 +12,7 @@ Submarine is a tool designed to refine this process. It provides editing and val
 
 ## Features
 
+- Subtitle formats: [SubRip](https://en.wikipedia.org/wiki/SubRip), .srt
 - **Toolset:**
   - Get subtitle by index
   - Add a new subtitle
@@ -43,7 +44,7 @@ sm add [FILE.srt] "[NEW-SUBTITLE]"
 sm validate [--llm] [VALID-FILE.srt] [TARGET.srt]
 
 # Mass rename
-sm mass-rename [--name="Resident Alien"] \
+sm mass-rename [--dry-run] [--name="Resident Alien"] \
           [--series-mode] [--season=3] [--episodes=8] \
           [--language="ru"] \
           [--separator="."] \
