@@ -21,6 +21,7 @@ Submarine is designed to assist in the translation process by providing various 
 - **Validation:**
   - Check integrity
   - Compare with another subtitle files (quantity of subtitles, timestamps, etc). For example, you can compare english subtitles with translated by LLM.
+- **Auto-backups:** automatically create backups of your subtitle files before making changes.
 
 ## Usage
 
@@ -63,3 +64,4 @@ Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whateve
 - Feature: set subtitle by offset
 - Feature: mass-rename
 - Feature: adjust timestamps
+- Feature: auto-backups
