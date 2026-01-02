@@ -16,6 +16,7 @@ Submarine is designed to assist in the translation process by providing various 
   - Check integrity
   - Compare with another subtitle files (quantity of subtitles, timestamps, etc). For example, you can compare english subtitles with translated by LLM.
 - **Toolset:**
+  - Get subtitle by index
   - Add a new subtitle
   - Set subtitle by offset
   - Mass-rename subtitle files
@@ -23,17 +24,25 @@ Submarine is designed to assist in the translation process by providing various 
 ## Usage
 
 ```bash
-# Check integrity
-# submarine validate [VALID-FILE.srt] [FILE-FOR-VALIDATION.srt]
-submarine validate [--llm] [VALID-FILE.srt] [TARGET.srt]
+# Get subtitle by index
+# submarine get [FILE.srt] [INDEX]
+submarine get [FILE.srt] [INDEX]
+
+# Set subtitle for index
+# submarine set [FILE.srt] [INDEX] "[SUBTITLE]"
+submarine set [FILE.srt] [INDEX] "[SUBTITLE]"
 
 # Add subtitle
 # submarine add [FILE.srt] "[NEW-SUBTITLE]"
 submarine add [FILE.srt] "[NEW-SUBTITLE]"
 
-# Set subtitle for index
-# submarine set [FILE.srt] [INDEX] "[SUBTITLE]"
-submarine set [FILE.srt] [INDEX] "[SUBTITLE]"
+# Check integrity
+# submarine validate [VALID-FILE.srt] [FILE-FOR-VALIDATION.srt]
+submarine validate [--llm] [VALID-FILE.srt] [TARGET.srt]
+
+# Mass rename   
+# submarine rename [FILE.srt] "[NEW-NAME]"
+submarine rename [--separator="."] [--name="Resident Alien"] [--series-mode] [--season=3] [--episodes=8] [--language="ru"] [FILE.srt] "[NEW-NAME]"
 ```
 
 ## Usage with LLM agent
