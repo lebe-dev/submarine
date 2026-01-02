@@ -12,42 +12,46 @@ Submarine is designed to assist in the translation process by providing various 
 
 ## Features
 
-- **Validation:**
-  - Check integrity
-  - Compare with another subtitle files (quantity of subtitles, timestamps, etc). For example, you can compare english subtitles with translated by LLM.
 - **Toolset:**
   - Get subtitle by index
   - Add a new subtitle
   - Set subtitle by offset
   - Mass-rename subtitle files
+- **Validation:**
+  - Check integrity
+  - Compare with another subtitle files (quantity of subtitles, timestamps, etc). For example, you can compare english subtitles with translated by LLM.
 
 ## Usage
 
 ```bash
 # Get subtitle by index
-# submarine get [FILE.srt] [INDEX]
-submarine get [FILE.srt] [INDEX]
+# sm get [FILE.srt] [INDEX]
+sm get [FILE.srt] [INDEX]
 
 # Set subtitle for index
-# submarine set [FILE.srt] [INDEX] "[SUBTITLE]"
-submarine set [FILE.srt] [INDEX] "[SUBTITLE]"
+# sm set [FILE.srt] [INDEX] "[SUBTITLE]"
+sm set [FILE.srt] [INDEX] "[SUBTITLE]"
 
 # Add subtitle
-# submarine add [FILE.srt] "[NEW-SUBTITLE]"
-submarine add [FILE.srt] "[NEW-SUBTITLE]"
+# sm add [FILE.srt] "[NEW-SUBTITLE]"
+sm add [FILE.srt] "[NEW-SUBTITLE]"
 
 # Check integrity
-# submarine validate [VALID-FILE.srt] [FILE-FOR-VALIDATION.srt]
-submarine validate [--llm] [VALID-FILE.srt] [TARGET.srt]
+# sm validate [VALID-FILE.srt] [FILE-FOR-VALIDATION.srt]
+sm validate [--llm] [VALID-FILE.srt] [TARGET.srt]
 
 # Mass rename   
-# submarine rename [FILE.srt] "[NEW-NAME]"
-submarine rename [--separator="."] [--name="Resident Alien"] [--series-mode] [--season=3] [--episodes=8] [--language="ru"] [FILE.srt]
+# sm rename [FILE.srt] "[NEW-NAME]"
+sm rename [--separator="."] [--name="Resident Alien"] [--series-mode] [--season=3] [--episodes=8] [--language="ru"] [FILE.srt]
+
+# Adjust timestamps
+# Delay in seconds
+sm add-delay [FILE.srt] [DELAY]
 ```
 
 ## Usage with LLM agent
 
-Put `submarine` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whatever and tell LLM to use it as a tool.
+Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whatever and tell LLM to use it as a tool.
 
 ## RoadMap
 
