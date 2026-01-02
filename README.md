@@ -43,7 +43,10 @@ sm validate [--llm] [VALID-FILE.srt] [TARGET.srt]
 
 # Mass rename   
 # sm rename [FILE.srt] "[NEW-NAME]"
-sm rename [--separator="."] [--name="Resident Alien"] [--series-mode] [--season=3] [--episodes=8] [--language="ru"] [FILE.srt]
+sm rename [--separator="."] [--name="Resident Alien"] \
+   [--series-mode] [--season=3] [--episodes=8] \
+   [--language="ru"] \
+   [FILE.srt]
 
 # Adjust timestamps
 # Delay in seconds
