@@ -42,7 +42,7 @@ submarine validate [--llm] [VALID-FILE.srt] [TARGET.srt]
 
 # Mass rename   
 # submarine rename [FILE.srt] "[NEW-NAME]"
-submarine rename [--separator="."] [--name="Resident Alien"] [--series-mode] [--season=3] [--episodes=8] [--language="ru"] [FILE.srt] "[NEW-NAME]"
+submarine rename [--separator="."] [--name="Resident Alien"] [--series-mode] [--season=3] [--episodes=8] [--language="ru"] [FILE.srt]
 ```
 
 ## Usage with LLM agent
