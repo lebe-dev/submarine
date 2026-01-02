@@ -3,4 +3,32 @@ name = "submarine"
 version = "0.1.0"
 edition = "2024"
 
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
+
+[features]
+default = ["cli"]
+cli = ["clap", "dirs"]
+
+[[bin]]
+name = "sm"
+path = "src/bin/cli/main.rs"
+
+[lib]
+name = "lib"
+path = "src/lib/lib.rs"
+
 [dependencies]
+anyhow = "1.0.100"
+thiserror = { version = "2.0.17" }
+chrono = "0.4.42"
+
+clap = { version = "4.5.53", features = ["derive"], optional = true}
+
+dirs = { version = "6.0.0", optional = true }
+
+log = "0.4.29"
+log4rs = "1.4.0"
