@@ -16,6 +16,7 @@ Submarine is designed to assist in the translation process by providing various 
   - Get subtitle by index
   - Add a new subtitle
   - Set subtitle by offset
+  - Timestamps management: add delay
   - Mass-rename subtitle files
 - **Validation:**
   - Check integrity
