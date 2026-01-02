@@ -41,12 +41,12 @@ sm add [FILE.srt] "[NEW-SUBTITLE]"
 # sm validate [VALID-FILE.srt] [FILE-FOR-VALIDATION.srt]
 sm validate [--llm] [VALID-FILE.srt] [TARGET.srt]
 
-# Mass rename   
-# sm rename [FILE.srt] "[NEW-NAME]"
-sm rename [--separator="."] [--name="Resident Alien"] \
-   [--series-mode] [--season=3] [--episodes=8] \
-   [--language="ru"] \
-   [FILE.srt]
+# Mass rename
+sm rename [--name="Resident Alien"] \
+          [--series-mode] [--season=3] [--episodes=8] \
+          [--language="ru"] \
+          [--separator="."] \
+          [FILE-MASK]
 
 # Adjust timestamps
 # Delay in seconds
