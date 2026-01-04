@@ -1,4 +1,4 @@
-use crate::subtitle::model::{Subtitle, SubtitleError};
+use crate::subtitle::model::{Subtitle, SubtitleError, SubtitleUpdate, UpdateReport};
 
 /// Service interface for subtitle operations
 pub trait SubtitleService {
@@ -87,4 +87,41 @@ pub trait SubtitleService {
     /// * `SubtitleError::ParseError` - The file format is invalid or corrupted
     /// * `SubtitleError::InvalidPath` - The filename contains path traversal attempts or invalid characters
     fn get_all(&self, filename: &str) -> Result<Vec<Subtitle>, SubtitleError>;
+
+    /// Updates a subtitle by its index with new values
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The name of the subtitle file (relative to service's base directory)
+    /// * `id` - The subtitle index to update (must be >= 1)
+    /// * `update` - Struct containing optional field updates
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(UpdateReport)` - Details about the update including backup path
+    /// * `Err(SubtitleError)` - If file not found, index doesn't exist, or validation fails
+    ///
+    /// # Behavior
+    ///
+    /// - Creates automatic backup before modification with format: filename.YYYY-MM-DD_HH-MM-SS
+    /// - Validates all new field values (timestamps must be valid, text non-empty, end > start)
+    /// - Writes entire file back in SRT format with proper spacing
+    /// - At least one field in `update` must be Some, otherwise returns NoFieldsToUpdate error
+    ///
+    /// # Errors
+    ///
+    /// * `SubtitleError::FileNotFound` - The subtitle file does not exist
+    /// * `SubtitleError::SubtitleNotFound` - No subtitle with the given index exists
+    /// * `SubtitleError::NoFieldsToUpdate` - No fields were specified for update
+    /// * `SubtitleError::ParseError` - The file format is invalid or corrupted
+    /// * `SubtitleError::InvalidPath` - The filename contains path traversal attempts
+    /// * `SubtitleError::BackupFailed` - Failed to create backup file
+    /// * `SubtitleError::WriteFailed` - Failed to write updated file
+    /// * `SubtitleError::IoError` - Failed to read/write the file
+    fn set(
+        &self,
+        filename: &str,
+        id: u32,
+        update: SubtitleUpdate,
+    ) -> Result<UpdateReport, SubtitleError>;
 }

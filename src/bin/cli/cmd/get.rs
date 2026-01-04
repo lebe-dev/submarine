@@ -63,6 +63,10 @@ pub fn handle(file: &str, index: u32) -> anyhow::Result<()> {
                     error!("i/o error: {}", err);
                     eprintln!("error: Failed to read file: {}", err);
                 }
+                _ => {
+                    error!("unexpected error: {}", e);
+                    eprintln!("error: {}", e);
+                }
             }
             std::process::exit(1);
         }

@@ -29,11 +29,19 @@ Submarine is designed to assist the translation process by providing various edi
 ```bash
 # Get subtitle by index
 # sm get [FILE.srt] [INDEX]
-sm get [FILE.srt] [INDEX]
+$ sm get FILE.srt 123
+
+125
+00:06:56,111 --> 00:06:57,678
+Thank you.
 
 # Set subtitle for index
-# sm set [FILE.srt] [INDEX] "[SUBTITLE]"
-sm set [FILE.srt] [INDEX] "[SUBTITLE]"
+# sm set [FILE.srt] [INDEX] \
+#       [--start=00:00:03,481] \
+#       [--end=00:00:04,481] \
+#       [--text "TEXT"]  
+$ sm set ResidentAlienS01E01.srt 123 \
+       --text "Okay"
 
 # Add subtitle
 # sm add [FILE.srt] "[NEW-SUBTITLE]"
@@ -52,6 +60,14 @@ sm mass-rename [--dry-run] [--name="Resident Alien"] \
 # Adjust timestamps
 # Delay in seconds
 sm add-delay [FILE.srt] [DELAY]
+```
+
+## Usage in chat with LLM
+
+Save content into srt-file and check:
+
+```bash
+sm doctor your-file.srt
 ```
 
 ## Usage with LLM agent

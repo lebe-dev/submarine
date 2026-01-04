@@ -30,6 +30,29 @@ pub enum Commands {
         index: u32,
     },
 
+    /// Set/update subtitle properties by index
+    Set {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+
+        /// Subtitle index to update (>= 1)
+        #[arg(value_name = "INDEX")]
+        index: u32,
+
+        /// New start timestamp in format HH:MM:SS,mmm
+        #[arg(long)]
+        start: Option<String>,
+
+        /// New end timestamp in format HH:MM:SS,mmm
+        #[arg(long)]
+        end: Option<String>,
+
+        /// New subtitle text (can be multi-line with \n)
+        #[arg(long)]
+        text: Option<String>,
+    },
+
     /// Diagnose and fix issues in SRT subtitle files
     Doctor {
         /// Path to the SRT file

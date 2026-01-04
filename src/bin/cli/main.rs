@@ -20,6 +20,18 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::Set {
+                file,
+                index,
+                start,
+                end,
+                text,
+            } => {
+                if let Err(e) = cmd::set::handle(&file, index, start, end, text) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
             Commands::Doctor { file, fix } => {
                 if let Err(e) = cmd::doctor::handle(&file, fix) {
                     eprintln!("error: {}", e);

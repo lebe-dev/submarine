@@ -18,6 +18,18 @@ pub enum SubtitleError {
 
     #[error("Invalid file path: {0}")]
     InvalidPath(String),
+
+    #[error("Subtitle with index {0} not found in file")]
+    SubtitleNotFound(u32),
+
+    #[error("No fields specified for update (at least one of --start, --end, or --text required)")]
+    NoFieldsToUpdate,
+
+    #[error("Failed to create backup: {0}")]
+    BackupFailed(String),
+
+    #[error("Failed to write updated file: {0}")]
+    WriteFailed(String),
 }
 
 #[nutype(
@@ -185,6 +197,40 @@ impl Display for Subtitle {
 
         Ok(())
     }
+}
+
+/// Represents partial update to a subtitle
+#[derive(Debug, Clone)]
+pub struct SubtitleUpdate {
+    pub start_time: Option<SubtitleTimestamp>,
+    pub end_time: Option<SubtitleTimestamp>,
+    pub text: Option<SubtitleText>,
+}
+
+impl SubtitleUpdate {
+    /// Check if at least one field is specified
+    pub fn has_updates(&self) -> bool {
+        self.start_time.is_some() || self.end_time.is_some() || self.text.is_some()
+    }
+
+    /// Apply this update to an existing subtitle, creating a new one
+    pub fn apply_to(&self, subtitle: &Subtitle) -> Result<Subtitle> {
+        let new_start = self.start_time.unwrap_or(subtitle.start_time);
+        let new_end = self.end_time.unwrap_or(subtitle.end_time);
+        let new_text = self.text.clone().unwrap_or_else(|| subtitle.text.clone());
+
+        // Use Subtitle::new() to get cross-field validation (end > start)
+        Subtitle::new(subtitle.index, new_start, new_end, new_text)
+    }
+}
+
+/// Report from a successful update operation
+#[derive(Debug, Clone)]
+pub struct UpdateReport {
+    pub file_path: String,
+    pub backup_path: String,
+    pub subtitle_index: u32,
+    pub fields_updated: Vec<String>,
 }
 
 #[cfg(test)]
