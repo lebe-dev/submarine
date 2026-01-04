@@ -96,7 +96,6 @@ Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whateve
 ## RoadMap
 
 - Feature: add a new subtitle
-- Feature: get-range
 - Feature: mass-rename
 - Feature: adjust timestamps
 - Feature: auto-backups
