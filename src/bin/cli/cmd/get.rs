@@ -4,7 +4,23 @@ use lib::subtitle::service::SubRipService;
 use log::{debug, error, info};
 use std::path::Path;
 
-pub fn handle(file: &str, index: u32) -> anyhow::Result<()> {
+pub fn handle(file: &str, index_str: &str) -> anyhow::Result<()> {
+    // Check if index is a range (contains '-')
+    if index_str.contains('-') {
+        debug!("detected range format, delegating to get_range handler");
+        return super::get_range::handle(file, index_str);
+    }
+
+    // Parse as single index
+    let index = index_str.parse::<u32>().map_err(|_| {
+        error!("invalid index: {}", index_str);
+        eprintln!(
+            "error: Invalid index '{}'. Must be a positive number or range (e.g., 120-123)",
+            index_str
+        );
+        std::process::exit(1);
+    })?;
+
     info!("getting subtitle {} from file: {}", index, file);
 
     let file_path = Path::new(file);

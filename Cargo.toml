@@ -1,6 +1,6 @@
 [package]
 name = "submarine"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 
 [profile.release]
@@ -23,7 +23,7 @@ path = "src/lib/lib.rs"
 
 [dependencies]
 anyhow = "1.0.100"
-thiserror = { version = "2.0.17" }
+thiserror = "2.0.17"
 chrono = "0.4.42"
 nutype = { version = "0.5", features = ["serde"] }
 

@@ -7,9 +7,9 @@ fn get_project_root() -> PathBuf {
 }
 
 // Helper to run CLI command
-fn run_get_command(file: &str, index: u32) -> std::process::Output {
+fn run_get_command(file: &str, index: &str) -> std::process::Output {
     Command::new("cargo")
-        .args(&["run", "--bin", "sm", "--", "get", file, &index.to_string()])
+        .args(&["run", "--bin", "sm", "--", "get", file, index])
         .output()
         .expect("Failed to execute command")
 }
@@ -31,7 +31,7 @@ fn test_get_existing_subtitle_simple() {
     let file = test_data_path("valid/simple.srt");
 
     // Test getting subtitle index 1
-    let output = run_get_command(&file, 1);
+    let output = run_get_command(&file, "1");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("1\n"));
@@ -39,7 +39,7 @@ fn test_get_existing_subtitle_simple() {
     assert!(stdout.contains("First subtitle"));
 
     // Test getting subtitle index 2
-    let output = run_get_command(&file, 2);
+    let output = run_get_command(&file, "2");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("2\n"));
@@ -47,7 +47,7 @@ fn test_get_existing_subtitle_simple() {
     assert!(stdout.contains("Second subtitle"));
 
     // Test getting subtitle index 3
-    let output = run_get_command(&file, 3);
+    let output = run_get_command(&file, "3");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("3\n"));
@@ -59,7 +59,7 @@ fn test_get_existing_subtitle_simple() {
 fn test_get_subtitle_with_html() {
     let file = test_data_path("valid/complex.srt");
 
-    let output = run_get_command(&file, 1);
+    let output = run_get_command(&file, "1");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("1\n"));
@@ -73,7 +73,7 @@ fn test_get_subtitle_with_index_gap() {
     let file = test_data_path("valid/complex.srt");
 
     // Index 5 exists (skips 3, 4)
-    let output = run_get_command(&file, 5);
+    let output = run_get_command(&file, "5");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("5\n"));
@@ -86,14 +86,14 @@ fn test_get_subtitle_from_real_file() {
     let file = test_data_path("Resident.Alien.S03E01.1080p.WEB-DL.RGzsRutracker.eng.srt");
 
     // Test getting subtitle index 1
-    let output = run_get_command(&file, 1);
+    let output = run_get_command(&file, "1");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("1\n"));
     assert!(stdout.contains("00:00:01,436 --> 00:00:03,481"));
 
     // Test getting subtitle index 2
-    let output = run_get_command(&file, 2);
+    let output = run_get_command(&file, "2");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("2\n"));
@@ -105,13 +105,13 @@ fn test_get_edge_case_indices() {
     let file = test_data_path("valid/simple.srt");
 
     // Test first subtitle (index 1)
-    let output = run_get_command(&file, 1);
+    let output = run_get_command(&file, "1");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("First subtitle"));
 
     // Test last subtitle (index 3 in simple.srt)
-    let output = run_get_command(&file, 3);
+    let output = run_get_command(&file, "3");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Third subtitle"));
@@ -123,7 +123,7 @@ fn test_get_edge_case_indices() {
 fn test_get_nonexistent_index() {
     let file = test_data_path("valid/simple.srt");
 
-    let output = run_get_command(&file, 99999);
+    let output = run_get_command(&file, "99999");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("not found"));
@@ -132,7 +132,7 @@ fn test_get_nonexistent_index() {
 
 #[test]
 fn test_get_file_not_found() {
-    let output = run_get_command("nonexistent.srt", 1);
+    let output = run_get_command("nonexistent.srt", "1");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("error") || stderr.contains("Error"));
@@ -147,7 +147,7 @@ fn test_get_file_not_found() {
 fn test_get_malformed_file() {
     let file = test_data_path("invalid/malformed.srt");
 
-    let output = run_get_command(&file, 1);
+    let output = run_get_command(&file, "1");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr).to_lowercase();
     assert!(stderr.contains("error"));
@@ -158,7 +158,7 @@ fn test_get_malformed_file() {
 fn test_get_empty_file() {
     let file = test_data_path("invalid/empty.srt");
 
-    let output = run_get_command(&file, 1);
+    let output = run_get_command(&file, "1");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("not found"));
@@ -166,7 +166,7 @@ fn test_get_empty_file() {
 
 #[test]
 fn test_get_path_traversal() {
-    let output = run_get_command("../../../etc/passwd", 1);
+    let output = run_get_command("../../../etc/passwd", "1");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("error") || stderr.contains("Error"));
@@ -182,7 +182,7 @@ fn test_get_index_zero() {
     let file = test_data_path("valid/simple.srt");
 
     // Index 0 is not valid in SRT (indices start at 1)
-    let output = run_get_command(&file, 0);
+    let output = run_get_command(&file, "0");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("not found"));
@@ -201,8 +201,66 @@ fn test_get_with_absolute_path() {
     fs::write(&temp_file, content).unwrap();
 
     // Test using absolute path
-    let output = run_get_command(temp_file.to_str().unwrap(), 1);
+    let output = run_get_command(temp_file.to_str().unwrap(), "1");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Test subtitle"));
+}
+
+// ========== Tests for get with range syntax ==========
+
+#[test]
+fn test_get_with_range_all_exist() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Use get command with range syntax
+    let output = run_get_command(&file, "1-3");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should return all 3 subtitles
+    assert!(stdout.contains("1\n"));
+    assert!(stdout.contains("First subtitle"));
+    assert!(stdout.contains("2\n"));
+    assert!(stdout.contains("Second subtitle"));
+    assert!(stdout.contains("3\n"));
+    assert!(stdout.contains("Third subtitle"));
+}
+
+#[test]
+fn test_get_with_range_single() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Use get command with range syntax for single subtitle
+    let output = run_get_command(&file, "2-2");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should return only subtitle 2
+    assert!(stdout.contains("2\n"));
+    assert!(stdout.contains("Second subtitle"));
+    assert!(!stdout.contains("First subtitle"));
+    assert!(!stdout.contains("Third subtitle"));
+}
+
+#[test]
+fn test_get_with_range_invalid_format() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Invalid range format
+    let output = run_get_command(&file, "5-2");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("error"));
+}
+
+#[test]
+fn test_get_with_invalid_index() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Invalid non-numeric index
+    let output = run_get_command(&file, "abc");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Invalid index"));
 }

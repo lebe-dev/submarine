@@ -25,9 +25,20 @@ pub enum Commands {
         #[arg(value_name = "FILE")]
         file: String,
 
-        /// Subtitle index to retrieve (>= 1)
+        /// Subtitle index to retrieve (>= 1) or range (e.g., 120-123)
         #[arg(value_name = "INDEX")]
-        index: u32,
+        index: String,
+    },
+
+    /// Get subtitles in an index range from an SRT file
+    GetRange {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+
+        /// Range of indices in format START-END (e.g., 120-123)
+        #[arg(value_name = "RANGE")]
+        range: String,
     },
 
     /// Set/update subtitle properties by index

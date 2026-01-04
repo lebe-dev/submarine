@@ -27,16 +27,27 @@ Submarine is designed to assist the translation process by providing various edi
 ## Usage
 
 ```bash
-# Get subtitle by index
-# sm get [FILE.srt] [INDEX]
+# Get subtitle by index or range
+# sm get [FILE.srt] [INDEX or RANGE]
 $ sm get FILE.srt 123
 
-125
-00:06:56,111 --> 00:06:57,678
-Thank you.
+123
+00:06:54,111 --> 00:06:56,111
+First subtitle
 
-# Get subtitles from index range
-# sm get [FILE.srt] [INDEX-RANGE]
+# Also supports range syntax
+$ sm get FILE.srt 123-124
+
+123
+00:06:54,111 --> 00:06:56,111
+First subtitle
+
+124
+00:06:56,111 --> 00:06:57,678
+Second subtitle
+
+# Alternative: use get-range command explicitly
+# sm get-range [FILE.srt] [START-END]
 $ sm get-range FILE.srt 123-125
 
 # Set subtitle for index
