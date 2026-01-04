@@ -22,9 +22,29 @@ pub fn handle(
         std::process::exit(1);
     }
 
-    // 2. Parse file path and extract base_dir/filename (same as get command)
     let file_path = Path::new(file);
     debug!("parsing file path: {:?}", file_path);
+
+    if file_path.is_relative() {
+        let current_dir = std::env::current_dir()
+            .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
+
+        let resolved = current_dir.join(file_path);
+        let normalized = resolved
+            .canonicalize()
+            .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
+
+        let canonical_current_dir = current_dir
+            .canonicalize()
+            .map_err(|e| anyhow::anyhow!("failed to resolve current directory: {}", e))?;
+
+        if !normalized.starts_with(&canonical_current_dir) {
+            error!("path traversal attempt detected: {:?}", file_path);
+            return Err(anyhow::anyhow!(
+                "invalid file path: path traversal not allowed"
+            ));
+        }
+    }
 
     let canonical_path = file_path
         .canonicalize()
@@ -45,7 +65,6 @@ pub fn handle(
         .to_string();
     debug!("filename: {}", filename);
 
-    // 3. Parse and validate timestamp options if provided
     let start_timestamp = if let Some(start_str) = start {
         debug!("parsing start timestamp: {}", start_str);
         let duration = Subtitle::parse_timestamp(&start_str)
