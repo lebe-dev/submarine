@@ -168,6 +168,30 @@ pub fn handle(
                     eprintln!("  New subtitle starts at: {}", new_start);
                     eprintln!("  New subtitle must start at or after the last subtitle ends");
                 }
+                SubtitleError::CsvParseError { line, message } => {
+                    error!("csv parse error at line {}: {}", line, message);
+                    eprintln!("error: CSV parsing failed at line {}", line);
+                    eprintln!("  {}", message);
+                }
+                SubtitleError::InvalidCsvHeader(delimiter, actual) => {
+                    error!("invalid csv header: {}", actual);
+                    eprintln!("error: Invalid CSV header");
+                    eprintln!("  Expected delimiter: {}", delimiter);
+                    eprintln!("  Got: {}", actual);
+                }
+                SubtitleError::TimestampOverlap {
+                    line,
+                    existing_end,
+                    new_start,
+                } => {
+                    error!(
+                        "timestamp overlap at line {}: existing ends at {}, new starts at {}",
+                        line, existing_end, new_start
+                    );
+                    eprintln!("error: Timestamp overlap at line {}", line);
+                    eprintln!("  Existing ends at: {}", existing_end);
+                    eprintln!("  New starts at: {}", new_start);
+                }
             }
             std::process::exit(1);
         }

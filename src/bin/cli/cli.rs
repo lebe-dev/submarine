@@ -96,4 +96,19 @@ pub enum Commands {
         #[arg(value_name = "FILE")]
         file: String,
     },
+
+    /// Import subtitles from a CSV file into an SRT file
+    Import {
+        /// Path to the SRT file
+        #[arg(value_name = "SRT_FILE")]
+        srt_file: String,
+
+        /// Path to the CSV file
+        #[arg(value_name = "CSV_FILE")]
+        csv_file: String,
+
+        /// CSV delimiter character (default: pipe '|')
+        #[arg(long, default_value = "|")]
+        delimiter: String,
+    },
 }

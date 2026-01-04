@@ -1,6 +1,6 @@
 [package]
 name = "submarine"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 
 [profile.release]
@@ -24,10 +24,14 @@ path = "src/lib/lib.rs"
 [dependencies]
 anyhow = "1.0.100"
 thiserror = "2.0.17"
-chrono = "0.4.42"
+
 nutype = { version = "0.5", features = ["serde"] }
 
 clap = { version = "4.5.53", features = ["derive"], optional = true}
+
+chrono = "0.4.42"
+
+csv = "1.4.0"
 
 log = "0.4.29"
 log4rs = "1.4.0"

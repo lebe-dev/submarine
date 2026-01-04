@@ -51,9 +51,9 @@ pub trait SubtitleService {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use submarine::subtitle::service::SubRipService;
-    /// use submarine::subtitle::ports::SubtitleService;
+    /// ```no_run
+    /// use lib::subtitle::service::SubRipService;
+    /// use lib::subtitle::ports::SubtitleService;
     ///
     /// let service = SubRipService::new("/path/to/subtitles");
     ///
@@ -166,4 +166,5 @@ pub trait SubtitleService {
         end_time: SubtitleTimestamp,
         text: SubtitleText,
     ) -> Result<AddReport, SubtitleError>;
+
 }

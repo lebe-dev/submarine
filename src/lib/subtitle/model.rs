@@ -35,6 +35,21 @@ pub enum SubtitleError {
         "Timestamp conflict: new subtitle (starts at {new_start}) must start at or after the last subtitle ends (at {last_end})"
     )]
     TimestampConflict { last_end: String, new_start: String },
+
+    #[error("CSV parsing error at line {line}: {message}")]
+    CsvParseError { line: usize, message: String },
+
+    #[error("Invalid CSV header: expected 'start_time{0}end_time{0}text', got '{1}'")]
+    InvalidCsvHeader(String, String),
+
+    #[error(
+        "Timestamp overlap detected: subtitle at CSV line {line} (starts at {new_start}) overlaps with existing subtitle (ends at {existing_end})"
+    )]
+    TimestampOverlap {
+        line: usize,
+        existing_end: String,
+        new_start: String,
+    },
 }
 
 #[nutype(
@@ -245,6 +260,17 @@ pub struct AddReport {
     pub backup_path: String,
     pub new_index: u32,
     pub total_subtitles: usize,
+}
+
+/// Report from a successful import operation
+#[derive(Debug, Clone)]
+pub struct ImportReport {
+    pub file_path: String,
+    pub backup_path: String,
+    pub imported_count: usize,
+    pub total_subtitles: usize,
+    pub start_index: u32,
+    pub end_index: u32,
 }
 
 #[cfg(test)]

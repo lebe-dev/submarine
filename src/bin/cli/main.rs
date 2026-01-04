@@ -60,6 +60,16 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::Import {
+                srt_file,
+                csv_file,
+                delimiter,
+            } => {
+                if let Err(e) = cmd::import::handle(&srt_file, &csv_file, &delimiter) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");
