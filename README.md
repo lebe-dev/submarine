@@ -39,9 +39,8 @@ sm set [FILE.srt] [INDEX] "[SUBTITLE]"
 # sm add [FILE.srt] "[NEW-SUBTITLE]"
 sm add [FILE.srt] "[NEW-SUBTITLE]"
 
-# Check integrity
-# sm validate [VALID-FILE.srt] [FILE-FOR-VALIDATION.srt]
-sm validate [--llm] [VALID-FILE.srt] [TARGET.srt]
+# Check file integrity
+sm doctor [--fix] [FILE.srt]
 
 # Mass rename
 sm mass-rename [--dry-run] [--name="Resident Alien"] \
@@ -61,7 +60,6 @@ Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whateve
 
 ## RoadMap
 
-- Feature: diag and fix broken subtitles if possible
 - Feature: add a new subtitle
 - Feature: set subtitle by offset
 - Feature: mass-rename
