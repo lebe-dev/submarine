@@ -11,6 +11,8 @@ test:
 test-all:
   cargo test --bin sm
   cargo test --lib
+  # Integration tests
+  cargo test --test '*'
 
 # Run tests with coverage report (HTML output)
 coverage:
