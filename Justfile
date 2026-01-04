@@ -35,18 +35,21 @@ coverage-open:
 coverage-clean:
   cargo llvm-cov clean --workspace
 
+release-linux: test-all
+  rm -f sm
+  rm -rf out
+  mkdir -p out
+  docker build --progress=plain --platform=linux/amd64 -t submarine .
+  docker create --name submarine-temp submarine
+  docker cp submarine-temp:/sm out/sm
+  docker rm submarine-temp
+  cp out/sm .
+  chmod +x sm
+  zip -9 -r sm-{{version}}-linux-amd64.zip sm
+  rm -f sm
+
 release-macos: test-all
   cargo build --release --bin sm
   cp target/release/sm sm
   zip -9 -r sm-{{version}}-macos-arm64.zip sm
-  rm -f sm
-
-release-linux:
-  rm -f sm
-  rm -rf out
-  docker build --progress=plain --platform=linux/amd64 -t submarine .
-  docker run -it --rm -v $(pwd)/out:/out submarine
-  cp out/sm .
-  chmod +x sm
-  zip -9 -r sm-{{version}}-linux-amd64.zip sm
   rm -f sm
