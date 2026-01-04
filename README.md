@@ -61,6 +61,7 @@ Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whateve
 
 ## RoadMap
 
+- Feature: diag and fix broken subtitles if possible
 - Feature: add a new subtitle
 - Feature: set subtitle by offset
 - Feature: mass-rename
