@@ -1,6 +1,9 @@
 init:
   cargo install cargo-llvm-cov
 
+run-examples:
+  cargo run --example subtitle_usage
+
 build:
   cargo build --bin sm
 
