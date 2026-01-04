@@ -35,6 +35,10 @@ $ sm get FILE.srt 123
 00:06:56,111 --> 00:06:57,678
 Thank you.
 
+# Get subtitles from index range
+# sm get [FILE.srt] [INDEX-RANGE]
+$ sm get-range FILE.srt 123-125
+
 # Set subtitle for index
 # sm set [FILE.srt] [INDEX] \
 #       [--start=00:00:03,481] \
@@ -43,9 +47,10 @@ Thank you.
 $ sm set ResidentAlienS01E01.srt 123 \
        --text "Okay"
 
-# Add subtitle
+# Add subtitle to the end of file
+# Automatically increment index and makes backup    
 # sm add [FILE.srt] "[NEW-SUBTITLE]"
-sm add [FILE.srt] "[NEW-SUBTITLE]"
+$ sm add ResidentAlienS01E01.srt "Okay"
 
 # Check file integrity
 sm doctor [--fix] [FILE.srt]
@@ -60,6 +65,9 @@ sm mass-rename [--dry-run] [--name="Resident Alien"] \
 # Adjust timestamps
 # Delay in seconds
 sm add-delay [FILE.srt] [DELAY]
+
+# Strip html tags, i.e. <i>, <b>, <u>, etc.
+sm strip-tags [FILE.srt]
 ```
 
 ## Usage in chat with LLM
@@ -77,7 +85,7 @@ Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whateve
 ## RoadMap
 
 - Feature: add a new subtitle
-- Feature: set subtitle by offset
+- Feature: get-range
 - Feature: mass-rename
 - Feature: adjust timestamps
 - Feature: auto-backups
