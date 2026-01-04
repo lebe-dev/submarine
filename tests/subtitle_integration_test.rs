@@ -123,3 +123,28 @@ fn test_subtitle_file_not_found() {
 
     assert!(result.is_err(), "Should return error for non-existent file");
 }
+
+#[test]
+fn test_parse_well_formed_srt_file() {
+    // This test verifies that the parser correctly handles well-formed SRT files
+    let service = SubRipService::new(PathBuf::from("test-data"));
+    let filename = "Resident.Alien.S03E01.1080p.WEB-DL.RGzsRutracker.eng.srt";
+
+    // Test a few subtitles to ensure parsing works correctly
+    let subtitle1 = service
+        .get_by_id(filename, 1)
+        .expect("Failed to get subtitle 1")
+        .expect("Subtitle 1 not found");
+
+    assert_eq!(*subtitle1.index.as_ref(), 1);
+    assert!(subtitle1.text.as_ref().contains("Previously on"));
+
+    let subtitle100 = service
+        .get_by_id(filename, 100)
+        .expect("Failed to get subtitle 100")
+        .expect("Subtitle 100 not found");
+
+    assert_eq!(*subtitle100.index.as_ref(), 100);
+
+    println!("Successfully verified parser works with well-formed SRT files");
+}

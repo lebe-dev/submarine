@@ -43,6 +43,10 @@ impl SubRipService {
     }
 
     /// Parse SRT file content into a vector of subtitles
+    ///
+    /// This parser expects well-formed SRT files. Files with formatting issues
+    /// (empty lines inside blocks, incorrect timestamps, etc.) should be fixed
+    /// using `sm doctor` command or manually before parsing.
     fn parse_srt_file(content: &str) -> Result<Vec<Subtitle>> {
         let mut subtitles = Vec::new();
 
