@@ -1,4 +1,7 @@
-use crate::subtitle::model::{Subtitle, SubtitleError, SubtitleUpdate, UpdateReport};
+use crate::subtitle::model::{
+    AddReport, Subtitle, SubtitleError, SubtitleText, SubtitleTimestamp, SubtitleUpdate,
+    UpdateReport,
+};
 
 /// Service interface for subtitle operations
 pub trait SubtitleService {
@@ -124,4 +127,43 @@ pub trait SubtitleService {
         id: u32,
         update: SubtitleUpdate,
     ) -> Result<UpdateReport, SubtitleError>;
+
+    /// Adds a new subtitle to the end of an SRT file
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The name of the subtitle file (relative to service's base directory)
+    /// * `start_time` - Start timestamp for the new subtitle
+    /// * `end_time` - End timestamp for the new subtitle (must be > start_time)
+    /// * `text` - The subtitle text content
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(AddReport)` - Details about the addition including backup path and new index
+    /// * `Err(SubtitleError)` - If file not found, validation fails, or write fails
+    ///
+    /// # Behavior
+    ///
+    /// - Reads all existing subtitles using `get_all()` to validate file format
+    /// - Automatically calculates new index as max(existing_indices) + 1
+    /// - Creates automatic backup before modification with format: filename.YYYY-MM-DD_HH-MM-SS
+    /// - Validates timestamps (must be valid format, end > start)
+    /// - Appends new subtitle to the array
+    /// - Writes entire file back in SRT format with proper spacing
+    ///
+    /// # Errors
+    ///
+    /// * `SubtitleError::FileNotFound` - The subtitle file does not exist
+    /// * `SubtitleError::ParseError` - The file format is invalid (run doctor --fix first)
+    /// * `SubtitleError::InvalidPath` - The filename contains path traversal attempts
+    /// * `SubtitleError::BackupFailed` - Failed to create backup file
+    /// * `SubtitleError::WriteFailed` - Failed to write updated file
+    /// * `SubtitleError::IoError` - Failed to read/write the file
+    fn add(
+        &self,
+        filename: &str,
+        start_time: SubtitleTimestamp,
+        end_time: SubtitleTimestamp,
+        text: SubtitleText,
+    ) -> Result<AddReport, SubtitleError>;
 }

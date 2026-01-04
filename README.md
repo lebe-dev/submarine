@@ -60,8 +60,8 @@ $ sm set ResidentAlienS01E01.srt 123 \
 
 # Add subtitle to the end of file
 # Automatically increment index and makes backup    
-# sm add [FILE.srt] "[NEW-SUBTITLE]"
-$ sm add ResidentAlienS01E01.srt "Okay"
+# sm add [FILE.srt] [START-END-TIMESTAMP] "[NEW-SUBTITLE]"
+$ sm add ResidentAlienS01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 
 # Check file integrity
 sm doctor [--fix] [FILE.srt]
@@ -95,7 +95,6 @@ Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whateve
 
 ## RoadMap
 
-- Feature: add a new subtitle
 - Feature: mass-rename
 - Feature: adjust timestamps
 - Feature: auto-backups

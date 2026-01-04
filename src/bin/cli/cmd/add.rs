@@ -1,26 +1,13 @@
-use lib::subtitle::model::{
-    Subtitle, SubtitleError, SubtitleText, SubtitleTimestamp, SubtitleUpdate,
-};
+use lib::subtitle::model::{Subtitle, SubtitleError, SubtitleText, SubtitleTimestamp};
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
 use log::{debug, error, info};
 use std::path::Path;
 
-pub fn handle(
-    file: &str,
-    index: u32,
-    start: Option<String>,
-    end: Option<String>,
-    text: Option<String>,
-) -> anyhow::Result<()> {
-    info!("setting subtitle {} in file: {}", index, file);
+pub fn handle(file: &str, timestamps: &str, text: &str) -> anyhow::Result<()> {
+    info!("adding subtitle to file: {}", file);
 
-    if start.is_none() && end.is_none() && text.is_none() {
-        error!("no fields specified for update");
-        eprintln!("error: At least one of --start, --end, or --text must be specified");
-        std::process::exit(1);
-    }
-
+    // 1. Parse and validate file path with path traversal protection
     let file_path = Path::new(file);
     debug!("parsing file path: {:?}", file_path);
 
@@ -64,58 +51,57 @@ pub fn handle(
         .to_string();
     debug!("filename: {}", filename);
 
-    let start_timestamp = if let Some(start_str) = start {
-        debug!("parsing start timestamp: {}", start_str);
-        let duration = Subtitle::parse_timestamp(&start_str)
-            .map_err(|e| anyhow::anyhow!("invalid start timestamp: {}", e))?;
-        Some(
-            SubtitleTimestamp::try_new(duration)
-                .map_err(|e| anyhow::anyhow!("invalid start timestamp value: {}", e))?,
-        )
-    } else {
-        None
-    };
+    // 2. Parse timestamps: split by "-" (hyphen)
+    debug!("parsing timestamps: {}", timestamps);
+    let parts: Vec<&str> = timestamps.splitn(2, '-').collect();
 
-    let end_timestamp = if let Some(end_str) = end {
-        debug!("parsing end timestamp: {}", end_str);
-        let duration = Subtitle::parse_timestamp(&end_str)
-            .map_err(|e| anyhow::anyhow!("invalid end timestamp: {}", e))?;
-        Some(
-            SubtitleTimestamp::try_new(duration)
-                .map_err(|e| anyhow::anyhow!("invalid end timestamp value: {}", e))?,
-        )
-    } else {
-        None
-    };
+    if parts.len() != 2 {
+        error!("invalid timestamp format: {}", timestamps);
+        eprintln!("error: Invalid timestamp format (expected 'HH:MM:SS,mmm-HH:MM:SS,mmm')");
+        eprintln!("example: \"00:00:10,000-00:00:12,500\"");
+        std::process::exit(1);
+    }
 
-    // 4. Parse and validate text option if provided
-    let subtitle_text = if let Some(text_str) = text {
-        debug!("validating text (length: {})", text_str.len());
-        Some(SubtitleText::try_new(text_str).map_err(|e| anyhow::anyhow!("invalid text: {}", e))?)
-    } else {
-        None
-    };
+    let start_str = parts[0];
+    let end_str = parts[1];
+    debug!("start: {}, end: {}", start_str, end_str);
 
-    // 5. Build update struct
-    let update = SubtitleUpdate {
-        start_time: start_timestamp,
-        end_time: end_timestamp,
-        text: subtitle_text,
-    };
+    // 3. Parse start timestamp
+    debug!("parsing start timestamp: {}", start_str);
+    let start_duration = Subtitle::parse_timestamp(start_str)
+        .map_err(|e| anyhow::anyhow!("invalid start timestamp: {}", e))?;
+    let start_timestamp = SubtitleTimestamp::try_new(start_duration)
+        .map_err(|e| anyhow::anyhow!("invalid start timestamp value: {}", e))?;
 
-    // 6. Create service and execute update
+    // 4. Parse end timestamp
+    debug!("parsing end timestamp: {}", end_str);
+    let end_duration = Subtitle::parse_timestamp(end_str)
+        .map_err(|e| anyhow::anyhow!("invalid end timestamp: {}", e))?;
+    let end_timestamp = SubtitleTimestamp::try_new(end_duration)
+        .map_err(|e| anyhow::anyhow!("invalid end timestamp value: {}", e))?;
+
+    // 5. Validate and sanitize text
+    debug!("validating text (length: {})", text.len());
+    let subtitle_text = SubtitleText::try_new(text.to_string())
+        .map_err(|e| anyhow::anyhow!("invalid text: {}", e))?;
+
+    // 6. Create service and execute add
     let service = SubRipService::new(base_dir);
 
-    debug!("updating subtitle {}...", index);
-    match service.set(&filename, index, update) {
+    debug!("adding new subtitle...");
+    match service.add(&filename, start_timestamp, end_timestamp, subtitle_text) {
         Ok(report) => {
-            info!("subtitle {} updated successfully", index);
+            info!(
+                "subtitle added successfully with index {}",
+                report.new_index
+            );
             debug!("backup created: {}", report.backup_path);
 
-            println!("✓ Subtitle {} updated successfully", index);
+            println!("✓ Subtitle added successfully");
             println!();
+            println!("New index: {}", report.new_index);
+            println!("Total subtitles: {}", report.total_subtitles);
             println!("Backup created: {}", report.backup_path);
-            println!("Fields updated: {}", report.fields_updated.join(", "));
 
             Ok(())
         }
@@ -130,18 +116,10 @@ pub fn handle(
                     error!("invalid file path: {}", msg);
                     eprintln!("error: Invalid file path: {}", msg);
                 }
-                SubtitleError::SubtitleNotFound(idx) => {
-                    error!("subtitle {} not found", idx);
-                    eprintln!("error: Subtitle with index {} not found in file", idx);
-                }
                 SubtitleError::ParseError(err) => {
                     error!("parse error: {}", err);
                     eprintln!("error: Failed to parse subtitle file: {}", err);
                     eprintln!("hint: Try running 'sm doctor --fix {}' first", file);
-                }
-                SubtitleError::NoFieldsToUpdate => {
-                    error!("no fields to update");
-                    eprintln!("error: At least one of --start, --end, or --text must be specified");
                 }
                 SubtitleError::BackupFailed(msg) => {
                     error!("backup failed: {}", msg);
@@ -167,6 +145,10 @@ pub fn handle(
                     eprintln!("  Last subtitle ends at: {}", last_end);
                     eprintln!("  New subtitle starts at: {}", new_start);
                     eprintln!("  New subtitle must start at or after the last subtitle ends");
+                }
+                _ => {
+                    error!("unexpected error: {}", e);
+                    eprintln!("error: {}", e);
                 }
             }
             std::process::exit(1);

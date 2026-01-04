@@ -1,10 +1,11 @@
 use crate::subtitle::model::{
-    Subtitle, SubtitleError, SubtitleIndex, SubtitleText, SubtitleTimestamp, SubtitleUpdate,
-    UpdateReport,
+    AddReport, Subtitle, SubtitleError, SubtitleIndex, SubtitleText, SubtitleTimestamp,
+    SubtitleUpdate, UpdateReport,
 };
 use crate::subtitle::ports::SubtitleService;
 use anyhow::{Context, Result, bail};
 use chrono::Local;
+use log::{debug, info};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -194,45 +195,35 @@ impl SubtitleService for SubRipService {
         id: u32,
         update: SubtitleUpdate,
     ) -> Result<UpdateReport, SubtitleError> {
-        // 1. Validate at least one field is specified
         if !update.has_updates() {
             return Err(SubtitleError::NoFieldsToUpdate);
         }
 
-        // 2. Validate filename (path traversal protection)
         Self::validate_filename(filename)?;
 
-        // 3. Build file path and check existence
         let file_path = self.build_file_path(filename);
         if !file_path.exists() {
             return Err(SubtitleError::FileNotFound(file_path.display().to_string()));
         }
 
-        // 4. Parse entire file to validate and load all subtitles
         let mut subtitles = self.get_all(filename)?;
 
-        // 5. Find subtitle with the given index
         let subtitle_pos = subtitles
             .iter()
             .position(|s| *s.index.as_ref() == id)
             .ok_or(SubtitleError::SubtitleNotFound(id))?;
 
-        // 6. Apply update (this performs cross-field validation)
         let updated_subtitle = update
             .apply_to(&subtitles[subtitle_pos])
             .map_err(SubtitleError::ParseError)?;
 
-        // 7. Replace the subtitle in the list
         subtitles[subtitle_pos] = updated_subtitle;
 
-        // 8. Create backup BEFORE writing
         let backup_path = self.create_backup(&file_path)?;
 
-        // 9. Serialize and write back to file
         let content = Self::serialize_to_srt(&subtitles);
         fs::write(&file_path, content).map_err(|e| SubtitleError::WriteFailed(e.to_string()))?;
 
-        // 10. Build report
         let mut fields_updated = Vec::new();
         if update.start_time.is_some() {
             fields_updated.push("start_time".to_string());
@@ -249,6 +240,92 @@ impl SubtitleService for SubRipService {
             backup_path,
             subtitle_index: id,
             fields_updated,
+        })
+    }
+
+    fn add(
+        &self,
+        filename: &str,
+        start_time: SubtitleTimestamp,
+        end_time: SubtitleTimestamp,
+        text: SubtitleText,
+    ) -> Result<AddReport, SubtitleError> {
+        info!("adding subtitle '{}' to file: {}", text.as_ref(), filename);
+        debug!(
+            "subtitle timestamps: {} --> {}",
+            Subtitle::format_timestamp(start_time.as_ref()),
+            Subtitle::format_timestamp(end_time.as_ref())
+        );
+        debug!("subtitle text length: {}", text.as_ref().len());
+
+        debug!("validating filename");
+        Self::validate_filename(filename)?;
+
+        let file_path = self.build_file_path(filename);
+        debug!("checking file existence: {:?}", file_path);
+        if !file_path.exists() {
+            return Err(SubtitleError::FileNotFound(file_path.display().to_string()));
+        }
+
+        debug!("reading existing subtitles");
+        let mut subtitles = self.get_all(filename)?;
+        debug!("found {} existing subtitles", subtitles.len());
+
+        let new_index = subtitles
+            .iter()
+            .map(|s| *s.index.as_ref())
+            .max()
+            .unwrap_or(0)
+            + 1;
+        debug!("calculated new index: {}", new_index);
+
+        if !subtitles.is_empty() {
+            debug!("validating timestamp against existing subtitles");
+            let max_end_time = subtitles.iter().map(|s| s.end_time.as_ref()).max().unwrap();
+            debug!(
+                "last subtitle ends at: {}",
+                Subtitle::format_timestamp(max_end_time)
+            );
+
+            if start_time.as_ref() < max_end_time {
+                debug!("timestamp conflict detected");
+                return Err(SubtitleError::TimestampConflict {
+                    last_end: Subtitle::format_timestamp(max_end_time),
+                    new_start: Subtitle::format_timestamp(start_time.as_ref()),
+                });
+            }
+            debug!("timestamp validation passed");
+        }
+
+        debug!("creating new subtitle with index {}", new_index);
+        let subtitle_index = SubtitleIndex::try_new(new_index)
+            .map_err(|e| SubtitleError::ParseError(anyhow::anyhow!("invalid index: {}", e)))?;
+
+        let new_subtitle = Subtitle::new(subtitle_index, start_time, end_time, text)
+            .map_err(SubtitleError::ParseError)?;
+
+        info!("creating backup");
+        let backup_path = self.create_backup(&file_path)?;
+        debug!("backup created: {}", backup_path);
+
+        subtitles.push(new_subtitle);
+        debug!(
+            "added subtitle to collection, total count: {}",
+            subtitles.len()
+        );
+
+        debug!("serializing subtitles to srt format");
+        let content = Self::serialize_to_srt(&subtitles);
+
+        debug!("writing file: {:?}", file_path);
+        fs::write(&file_path, content).map_err(|e| SubtitleError::WriteFailed(e.to_string()))?;
+
+        info!("subtitle added successfully with index {}", new_index);
+        Ok(AddReport {
+            file_path: file_path.display().to_string(),
+            backup_path,
+            new_index,
+            total_subtitles: subtitles.len(),
         })
     }
 }
@@ -771,5 +848,212 @@ mod tests {
         let subtitle = service.get_by_id("test.srt", 1).unwrap().unwrap();
         assert_eq!(subtitle.line_count(), 3);
         assert_eq!(subtitle.text.as_ref(), "Line 1\nLine 2\nLine 3");
+    }
+
+    // Tests for add functionality
+
+    #[test]
+    fn test_add_to_empty_file() {
+        let (service, temp_dir) = create_test_service();
+        write_test_file(&temp_dir, "empty.srt", "");
+
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(1000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(2000)).unwrap();
+        let text = SubtitleText::try_new("First subtitle".to_string()).unwrap();
+
+        let report = service.add("empty.srt", start, end, text).unwrap();
+        assert_eq!(report.new_index, 1);
+        assert_eq!(report.total_subtitles, 1);
+
+        let subtitles = service.get_all("empty.srt").unwrap();
+        assert_eq!(subtitles.len(), 1);
+        assert_eq!(*subtitles[0].index.as_ref(), 1);
+        assert_eq!(subtitles[0].text.as_ref(), "First subtitle");
+    }
+
+    #[test]
+    fn test_add_to_existing_file() {
+        let (service, temp_dir) = create_test_service();
+        let content =
+            "1\n00:00:01,000 --> 00:00:02,000\nFirst\n\n2\n00:00:03,000 --> 00:00:04,000\nSecond";
+        write_test_file(&temp_dir, "test.srt", content);
+
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(5000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(6000)).unwrap();
+        let text = SubtitleText::try_new("Third".to_string()).unwrap();
+
+        let report = service.add("test.srt", start, end, text).unwrap();
+        assert_eq!(report.new_index, 3); // max(1,2) + 1 = 3
+        assert_eq!(report.total_subtitles, 3);
+
+        let subtitles = service.get_all("test.srt").unwrap();
+        assert_eq!(subtitles.len(), 3);
+        assert_eq!(*subtitles[2].index.as_ref(), 3);
+        assert_eq!(subtitles[2].text.as_ref(), "Third");
+    }
+
+    #[test]
+    fn test_add_with_gap_in_indices() {
+        let (service, temp_dir) = create_test_service();
+        let content =
+            "1\n00:00:01,000 --> 00:00:02,000\nFirst\n\n5\n00:00:03,000 --> 00:00:04,000\nFifth";
+        write_test_file(&temp_dir, "gaps.srt", content);
+
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(5000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(6000)).unwrap();
+        let text = SubtitleText::try_new("Sixth".to_string()).unwrap();
+
+        let report = service.add("gaps.srt", start, end, text).unwrap();
+        assert_eq!(report.new_index, 6); // max(1,5) + 1 = 6
+
+        let subtitles = service.get_all("gaps.srt").unwrap();
+        assert_eq!(subtitles.len(), 3);
+        assert_eq!(*subtitles[2].index.as_ref(), 6);
+    }
+
+    #[test]
+    fn test_add_invalid_timestamps() {
+        let (service, temp_dir) = create_test_service();
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nFirst";
+        write_test_file(&temp_dir, "test.srt", content);
+
+        // End before start - should fail
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(5000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(3000)).unwrap();
+        let text = SubtitleText::try_new("Bad".to_string()).unwrap();
+
+        let result = service.add("test.srt", start, end, text);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_multiline_text() {
+        let (service, temp_dir) = create_test_service();
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nFirst";
+        write_test_file(&temp_dir, "test.srt", content);
+
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(3000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(5000)).unwrap();
+        let text = SubtitleText::try_new("Line 1\nLine 2\nLine 3".to_string()).unwrap();
+
+        let report = service.add("test.srt", start, end, text).unwrap();
+        assert_eq!(report.new_index, 2);
+
+        let subtitle = service.get_by_id("test.srt", 2).unwrap().unwrap();
+        assert_eq!(subtitle.line_count(), 3);
+        assert_eq!(subtitle.text.as_ref(), "Line 1\nLine 2\nLine 3");
+    }
+
+    #[test]
+    fn test_add_backup_created() {
+        let (service, temp_dir) = create_test_service();
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nFirst";
+        write_test_file(&temp_dir, "test.srt", content);
+
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(3000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(5000)).unwrap();
+        let text = SubtitleText::try_new("Second".to_string()).unwrap();
+
+        let report = service.add("test.srt", start, end, text).unwrap();
+
+        // Verify backup exists
+        let backup_path = PathBuf::from(&report.backup_path);
+        assert!(backup_path.exists());
+
+        // Verify backup contains only original content (1 subtitle)
+        let backup_content = fs::read_to_string(&backup_path).unwrap();
+        let backup_subs = SubRipService::parse_srt_file(&backup_content).unwrap();
+        assert_eq!(backup_subs.len(), 1);
+    }
+
+    #[test]
+    fn test_add_file_not_found() {
+        let (service, _temp_dir) = create_test_service();
+
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(1000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(2000)).unwrap();
+        let text = SubtitleText::try_new("Text".to_string()).unwrap();
+
+        let result = service.add("nonexistent.srt", start, end, text);
+        assert!(matches!(result, Err(SubtitleError::FileNotFound(_))));
+    }
+
+    #[test]
+    fn test_add_malformed_file() {
+        let (service, temp_dir) = create_test_service();
+        write_test_file(&temp_dir, "bad.srt", "INVALID CONTENT\nNOT SRT FORMAT");
+
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(1000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(2000)).unwrap();
+        let text = SubtitleText::try_new("Text".to_string()).unwrap();
+
+        let result = service.add("bad.srt", start, end, text);
+        assert!(matches!(result, Err(SubtitleError::ParseError(_))));
+    }
+
+    #[test]
+    fn test_add_timestamp_before_last() {
+        let (service, temp_dir) = create_test_service();
+        let content =
+            "1\n00:00:01,000 --> 00:00:02,000\nFirst\n\n2\n00:00:05,000 --> 00:00:07,000\nSecond";
+        write_test_file(&temp_dir, "test.srt", content);
+
+        // Try to add subtitle that starts before the last one ends (at 00:00:07,000)
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(6000)).unwrap(); // 00:00:06,000
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(8000)).unwrap();
+        let text = SubtitleText::try_new("Too early".to_string()).unwrap();
+
+        let result = service.add("test.srt", start, end, text);
+        assert!(matches!(
+            result,
+            Err(SubtitleError::TimestampConflict { .. })
+        ));
+
+        if let Err(SubtitleError::TimestampConflict {
+            last_end,
+            new_start,
+        }) = result
+        {
+            assert_eq!(last_end, "00:00:07,000");
+            assert_eq!(new_start, "00:00:06,000");
+        }
+    }
+
+    #[test]
+    fn test_add_timestamp_overlapping() {
+        let (service, temp_dir) = create_test_service();
+        let content = "1\n00:00:10,000 --> 00:00:15,000\nFirst";
+        write_test_file(&temp_dir, "test.srt", content);
+
+        // Try to add subtitle that overlaps (starts at 00:00:14,000, last ends at 00:00:15,000)
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(14000)).unwrap();
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(16000)).unwrap();
+        let text = SubtitleText::try_new("Overlapping".to_string()).unwrap();
+
+        let result = service.add("test.srt", start, end, text);
+        assert!(matches!(
+            result,
+            Err(SubtitleError::TimestampConflict { .. })
+        ));
+    }
+
+    #[test]
+    fn test_add_timestamp_exactly_after() {
+        let (service, temp_dir) = create_test_service();
+        let content =
+            "1\n00:00:01,000 --> 00:00:02,000\nFirst\n\n2\n00:00:05,000 --> 00:00:07,000\nSecond";
+        write_test_file(&temp_dir, "test.srt", content);
+
+        // Add subtitle that starts exactly when the last one ends (at 00:00:07,000)
+        let start = SubtitleTimestamp::try_new(Duration::milliseconds(7000)).unwrap(); // 00:00:07,000
+        let end = SubtitleTimestamp::try_new(Duration::milliseconds(9000)).unwrap();
+        let text = SubtitleText::try_new("Exactly after".to_string()).unwrap();
+
+        let result = service.add("test.srt", start, end, text);
+        assert!(result.is_ok());
+
+        let report = result.unwrap();
+        assert_eq!(report.new_index, 3);
+        assert_eq!(report.total_subtitles, 3);
     }
 }

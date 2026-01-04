@@ -74,4 +74,19 @@ pub enum Commands {
         #[arg(long)]
         fix: bool,
     },
+
+    /// Add a new subtitle to the end of an SRT file
+    Add {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+
+        /// Timestamp range in format HH:MM:SS,mmm-HH:MM:SS,mmm
+        #[arg(value_name = "TIMESTAMPS")]
+        timestamps: String,
+
+        /// Subtitle text (can be multi-line with \n)
+        #[arg(value_name = "TEXT")]
+        text: String,
+    },
 }

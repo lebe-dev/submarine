@@ -44,6 +44,16 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::Add {
+                file,
+                timestamps,
+                text,
+            } => {
+                if let Err(e) = cmd::add::handle(&file, &timestamps, &text) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");

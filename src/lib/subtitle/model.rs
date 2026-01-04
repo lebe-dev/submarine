@@ -30,6 +30,11 @@ pub enum SubtitleError {
 
     #[error("Failed to write updated file: {0}")]
     WriteFailed(String),
+
+    #[error(
+        "Timestamp conflict: new subtitle (starts at {new_start}) must start at or after the last subtitle ends (at {last_end})"
+    )]
+    TimestampConflict { last_end: String, new_start: String },
 }
 
 #[nutype(
@@ -233,11 +238,19 @@ pub struct UpdateReport {
     pub fields_updated: Vec<String>,
 }
 
+/// Report from a successful add operation
+#[derive(Debug, Clone)]
+pub struct AddReport {
+    pub file_path: String,
+    pub backup_path: String,
+    pub new_index: u32,
+    pub total_subtitles: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // Helper function for creating test subtitles
     fn make_test_subtitle(index: u32, start_ms: i64, end_ms: i64, text: &str) -> Subtitle {
         Subtitle::new(
             SubtitleIndex::try_new(index).unwrap(),
@@ -248,7 +261,6 @@ mod tests {
         .unwrap()
     }
 
-    // Nutype validation tests
     #[test]
     fn test_subtitle_index_validation() {
         assert!(SubtitleIndex::try_new(1).is_ok());
