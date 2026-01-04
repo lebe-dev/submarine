@@ -11,7 +11,7 @@ panic = 'abort'
 
 [features]
 default = ["cli"]
-cli = ["clap", "dirs"]
+cli = ["clap"]
 
 [[bin]]
 name = "sm"
@@ -25,10 +25,12 @@ path = "src/lib/lib.rs"
 anyhow = "1.0.100"
 thiserror = { version = "2.0.17" }
 chrono = "0.4.42"
+nutype = { version = "0.5", features = ["serde"] }
 
 clap = { version = "4.5.53", features = ["derive"], optional = true}
 
-dirs = { version = "6.0.0", optional = true }
-
 log = "0.4.29"
 log4rs = "1.4.0"
+
+[dev-dependencies]
+tempfile = "3.8"

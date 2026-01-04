@@ -1,0 +1,7 @@
+1
+INVALID TIMESTAMP FORMAT
+This is broken
+
+2
+00:00:03,000
+Missing arrow separator

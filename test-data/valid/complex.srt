@@ -1,0 +1,13 @@
+1
+00:00:01,436 --> 00:00:03,481
+<i>Previously on
+"Resident Alien"...</i>
+
+2
+00:00:03,481 --> 00:00:05,135
+Hello, Harry.
+
+5
+00:00:07,790 --> 00:00:09,357
+<i>You should be
+helping each other,</i>
