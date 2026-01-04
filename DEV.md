@@ -1,0 +1,5 @@
+# Development
+
+```bash
+just build
+```
