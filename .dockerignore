@@ -2,3 +2,5 @@
 *.md
 .env
 /out
+/*.zip
+/*.srt

@@ -4,3 +4,5 @@
 !DEV.md
 .env
 /out
+/*.zip
+/*.srt
