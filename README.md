@@ -67,18 +67,18 @@ $ sm add ResidentAlienS01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 sm doctor [--fix] [FILE.srt]
 
 # Mass rename
-sm mass-rename [--dry-run] [--name="Resident Alien"] \
-          [--series-mode] [--season=3] [--episodes=8] \
-          [--language="ru"] \
-          [--separator="."] \
-          [FILE-MASK]
+# sm mass-rename [--dry-run] [--name="Resident Alien"] \
+#          [--series-mode] [--season=3] [--episodes=8] \
+#          [--language="ru"] \
+#          [--separator="."] \
+#          [FILE-MASK]
 
 # Adjust timestamps
 # Delay in seconds
-sm add-delay [FILE.srt] [DELAY]
+# sm add-delay [FILE.srt] [DELAY]
 
 # Strip html tags, i.e. <i>, <b>, <u>, etc.
-sm strip-tags [FILE.srt]
+# sm strip-tags [FILE.srt]
 ```
 
 ## Usage in chat with LLM
