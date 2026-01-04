@@ -29,4 +29,15 @@ pub enum Commands {
         #[arg(value_name = "INDEX")]
         index: u32,
     },
+
+    /// Diagnose and fix issues in SRT subtitle files
+    Doctor {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+
+        /// Fix issues automatically
+        #[arg(long)]
+        fix: bool,
+    },
 }

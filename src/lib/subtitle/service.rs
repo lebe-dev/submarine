@@ -151,6 +151,20 @@ impl SubtitleService for SubRipService {
 
         Ok(result)
     }
+
+    fn get_all(&self, filename: &str) -> Result<Vec<Subtitle>, SubtitleError> {
+        Self::validate_filename(filename)?;
+
+        let file_path = self.build_file_path(filename);
+
+        if !file_path.exists() {
+            return Err(SubtitleError::FileNotFound(file_path.display().to_string()));
+        }
+
+        let content = fs::read_to_string(&file_path)?;
+
+        Self::parse_srt_file(&content).map_err(SubtitleError::ParseError)
+    }
 }
 
 #[cfg(test)]

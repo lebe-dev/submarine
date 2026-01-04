@@ -68,4 +68,23 @@ pub trait SubtitleService {
     /// }
     /// ```
     fn get_by_id(&self, filename: &str, id: u32) -> Result<Option<Subtitle>, SubtitleError>;
+
+    /// Retrieves all subtitles from a SubRip (.srt) file
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The name of the subtitle file (relative to service's base directory)
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Vec<Subtitle>)` - Vector of all subtitles in the file
+    /// * `Err(SubtitleError)` - If the file cannot be read, is malformed, or the filename is invalid
+    ///
+    /// # Errors
+    ///
+    /// * `SubtitleError::FileNotFound` - The subtitle file does not exist
+    /// * `SubtitleError::IoError` - Failed to read the file
+    /// * `SubtitleError::ParseError` - The file format is invalid or corrupted
+    /// * `SubtitleError::InvalidPath` - The filename contains path traversal attempts or invalid characters
+    fn get_all(&self, filename: &str) -> Result<Vec<Subtitle>, SubtitleError>;
 }

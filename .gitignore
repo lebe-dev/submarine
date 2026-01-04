@@ -2,3 +2,4 @@
 *.md
 !README.md
 !DEV.md
+.env

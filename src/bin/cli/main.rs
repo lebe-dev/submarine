@@ -20,6 +20,12 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::Doctor { file, fix } => {
+                if let Err(e) = cmd::doctor::handle(&file, fix) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");
