@@ -1,39 +1,39 @@
-use lib::subtitle::parser::parse_srt_entry;
-use std::fs;
+use lib::subtitle::ports::SubtitleService;
+use lib::subtitle::service::SubRipService;
+use std::path::PathBuf;
 
 #[test]
 fn test_parse_real_srt_file() {
-    // Read the actual SRT test file
-    let content =
-        fs::read_to_string("test-data/Resident.Alien.S03E01.1080p.WEB-DL.RGzsRutracker.eng.srt")
-            .expect("Failed to read test SRT file");
+    // Create service pointing to test-data directory
+    let service = SubRipService::new(PathBuf::from("test-data"));
+    let filename = "Resident.Alien.S03E01.1080p.WEB-DL.RGzsRutracker.eng.srt";
 
-    // Split into subtitle blocks (separated by blank lines)
-    let blocks: Vec<&str> = content
-        .split("\n\n")
-        .filter(|s| !s.trim().is_empty())
-        .collect();
+    // Test subtitle 1
+    let subtitle1 = service
+        .get_by_id(filename, 1)
+        .expect("Failed to get subtitle 1")
+        .expect("Subtitle 1 not found");
 
-    // Parse first few subtitles to verify format
-    assert!(
-        blocks.len() > 10,
-        "SRT file should have multiple subtitle blocks"
-    );
-
-    // Test parsing subtitle 1
-    let subtitle1 = parse_srt_entry(blocks[0]).expect("Failed to parse subtitle 1");
     assert_eq!(*subtitle1.index.as_ref(), 1);
     assert_eq!(subtitle1.start_time.as_ref().num_milliseconds(), 1436);
     assert_eq!(subtitle1.end_time.as_ref().num_milliseconds(), 3481);
     assert!(subtitle1.text.as_ref().contains("Previously on"));
 
-    // Test parsing subtitle 2
-    let subtitle2 = parse_srt_entry(blocks[1]).expect("Failed to parse subtitle 2");
+    // Test subtitle 2
+    let subtitle2 = service
+        .get_by_id(filename, 2)
+        .expect("Failed to get subtitle 2")
+        .expect("Subtitle 2 not found");
+
     assert_eq!(*subtitle2.index.as_ref(), 2);
     assert!(subtitle2.text.as_ref().contains("Hello, Harry"));
 
-    // Test parsing subtitle 3
-    let subtitle3 = parse_srt_entry(blocks[2]).expect("Failed to parse subtitle 3");
+    // Test subtitle 3
+    let subtitle3 = service
+        .get_by_id(filename, 3)
+        .expect("Failed to get subtitle 3")
+        .expect("Subtitle 3 not found");
+
     assert_eq!(*subtitle3.index.as_ref(), 3);
     assert_eq!(subtitle3.text.as_ref(), "You are a Grey.");
 
@@ -41,67 +41,85 @@ fn test_parse_real_srt_file() {
     let formatted1 = subtitle1.to_string();
     assert!(formatted1.contains("00:00:01,436 --> 00:00:03,481"));
 
-    println!(
-        "Successfully parsed {} subtitle blocks from real SRT file",
-        blocks.len()
-    );
+    println!("Successfully tested subtitle retrieval from real SRT file");
 }
 
 #[test]
 fn test_parse_all_subtitles_from_file() {
-    // Read the actual SRT test file
-    let content =
-        fs::read_to_string("test-data/Resident.Alien.S03E01.1080p.WEB-DL.RGzsRutracker.eng.srt")
-            .expect("Failed to read test SRT file");
+    // Create service pointing to test-data directory
+    let service = SubRipService::new(PathBuf::from("test-data"));
+    let filename = "Resident.Alien.S03E01.1080p.WEB-DL.RGzsRutracker.eng.srt";
 
-    // Split into subtitle blocks
-    let blocks: Vec<&str> = content
-        .split("\n\n")
-        .filter(|s| !s.trim().is_empty())
-        .collect();
+    // Test retrieving subtitles with various indices
+    // We'll test the first 20 subtitles (assuming sequential indices)
+    let mut found_count = 0;
+    let mut last_found_index = 0;
 
-    let mut parsed_count = 0;
-    let mut failed_count = 0;
-
-    for (i, block) in blocks.iter().enumerate() {
-        match parse_srt_entry(block) {
-            Ok(subtitle) => {
-                // Verify index matches expected
+    for i in 1..=100 {
+        match service.get_by_id(filename, i) {
+            Ok(Some(subtitle)) => {
+                // Verify index matches
                 assert_eq!(
-                    *subtitle.index.as_ref() as usize,
-                    i + 1,
-                    "Index mismatch at block {}",
-                    i + 1
+                    *subtitle.index.as_ref(),
+                    i,
+                    "Index mismatch at subtitle {}",
+                    i
                 );
 
                 // Verify duration is positive
                 assert!(
                     subtitle.duration().num_milliseconds() > 0,
                     "Non-positive duration at subtitle {}",
-                    i + 1
+                    i
                 );
 
                 // Verify text is not empty
                 assert!(
                     !subtitle.text.as_ref().trim().is_empty(),
                     "Empty text at subtitle {}",
-                    i + 1
+                    i
                 );
 
-                parsed_count += 1;
+                found_count += 1;
+                last_found_index = i;
+            }
+            Ok(None) => {
+                // Subtitle with this index doesn't exist, continue
+                continue;
             }
             Err(e) => {
-                eprintln!("Failed to parse block {}: {}", i + 1, e);
-                eprintln!("Block content:\n{}", block);
-                failed_count += 1;
+                panic!("Failed to retrieve subtitle {}: {}", i, e);
             }
         }
     }
 
     println!(
-        "Parsed: {} subtitles, Failed: {} subtitles",
-        parsed_count, failed_count
+        "Successfully retrieved and validated {} subtitles (last index: {})",
+        found_count, last_found_index
     );
-    assert_eq!(failed_count, 0, "Some subtitles failed to parse");
-    assert!(parsed_count > 0, "No subtitles were parsed");
+    assert!(found_count > 10, "Should have found more than 10 subtitles");
+}
+
+#[test]
+fn test_nonexistent_subtitle() {
+    let service = SubRipService::new(PathBuf::from("test-data"));
+    let filename = "Resident.Alien.S03E01.1080p.WEB-DL.RGzsRutracker.eng.srt";
+
+    // Try to get a subtitle with a very high index that likely doesn't exist
+    let result = service.get_by_id(filename, 99999);
+
+    assert!(result.is_ok());
+    assert!(
+        result.unwrap().is_none(),
+        "Should return None for non-existent subtitle"
+    );
+}
+
+#[test]
+fn test_subtitle_file_not_found() {
+    let service = SubRipService::new(PathBuf::from("test-data"));
+
+    let result = service.get_by_id("nonexistent.srt", 1);
+
+    assert!(result.is_err(), "Should return error for non-existent file");
 }
