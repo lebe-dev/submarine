@@ -89,4 +89,11 @@ pub enum Commands {
         #[arg(value_name = "TEXT")]
         text: String,
     },
+
+    /// Display statistics and information about an SRT file
+    Info {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+    },
 }

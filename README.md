@@ -27,6 +27,10 @@ Submarine is designed to assist the translation process by providing various edi
 ## Usage
 
 ```bash
+# Show information about subtitles file
+# sm info [FILE.srt]
+$ sm info FILE.srt
+
 # Get subtitle by index or range
 # sm get [FILE.srt] [INDEX or RANGE]
 $ sm get FILE.srt 123

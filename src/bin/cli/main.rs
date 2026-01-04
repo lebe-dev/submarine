@@ -54,6 +54,12 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::Info { file } => {
+                if let Err(e) = cmd::info::handle(&file) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");
