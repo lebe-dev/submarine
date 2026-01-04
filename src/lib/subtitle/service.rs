@@ -142,15 +142,35 @@ impl SubRipService {
             .join("\n\n")
     }
 
-    /// Create backup file with timestamp
+    /// Create backup file with timestamp in backups/ subdirectory
     fn create_backup(&self, file_path: &Path) -> Result<String, SubtitleError> {
-        let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S");
-        let backup_path = format!("{}.{}", file_path.display(), timestamp);
+        debug!("creating backup for file: {:?}", file_path);
 
+        let backups_dir = PathBuf::from("backups");
+        debug!("ensuring backups directory exists: {:?}", backups_dir);
+        fs::create_dir_all(&backups_dir).map_err(|e| {
+            SubtitleError::BackupFailed(format!("failed to create backups directory: {}", e))
+        })?;
+
+        let filename = file_path
+            .file_name()
+            .ok_or_else(|| SubtitleError::BackupFailed("invalid file path".to_string()))?;
+
+        let now = Local::now();
+        let timestamp = format!(
+            "{}.{:06}",
+            now.format("%Y-%m-%d_%H-%M-%S"),
+            now.timestamp_subsec_micros()
+        );
+        let backup_filename = format!("{}.{}", filename.to_string_lossy(), timestamp);
+        let backup_path = backups_dir.join(backup_filename);
+
+        debug!("copying file to backup: {:?}", backup_path);
         fs::copy(file_path, &backup_path)
             .map_err(|e| SubtitleError::BackupFailed(e.to_string()))?;
 
-        Ok(backup_path)
+        info!("backup created: {}", backup_path.display());
+        Ok(backup_path.display().to_string())
     }
 }
 
@@ -797,6 +817,10 @@ mod tests {
 
         let report = service.set("test.srt", 1, update).unwrap();
 
+        // Verify backup path is in backups/ subdirectory
+        assert!(report.backup_path.starts_with("backups/"));
+        assert!(report.backup_path.contains("test.srt."));
+
         // Verify backup exists
         let backup_path = PathBuf::from(&report.backup_path);
         assert!(backup_path.exists());
@@ -955,6 +979,10 @@ mod tests {
         let text = SubtitleText::try_new("Second".to_string()).unwrap();
 
         let report = service.add("test.srt", start, end, text).unwrap();
+
+        // Verify backup path is in backups/ subdirectory
+        assert!(report.backup_path.starts_with("backups/"));
+        assert!(report.backup_path.contains("test.srt."));
 
         // Verify backup exists
         let backup_path = PathBuf::from(&report.backup_path);
