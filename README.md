@@ -22,6 +22,8 @@ Submarine is designed to assist the translation process by providing various edi
 - **Validation:**
   - Check integrity
   - Compare with another subtitle files (quantity of subtitles, timestamps, etc). For example, you can compare english subtitles with translated by LLM.
+- **Verification:**
+  - Verify translated subtitles against the original content
 - **Auto-backups:** automatically create backups of your subtitle files before making changes.
 
 ## Usage
@@ -70,7 +72,8 @@ $ sm add ResidentAlienS01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 $ sm import ResidentAlienS01E01.srt import.csv
 
 # Check file integrity
-sm doctor [--fix] [FILE.srt]
+# sm doctor [--fix] [FILE.srt]
+sm doctor --fix ResidentAlienS01E01.eng.srt
 
 # Mass rename
 # - file-mask is case-insensitive
@@ -90,12 +93,23 @@ $ sm mass-rename --dry-run \
 # sm compare [FILE1.srt] [FILE2.srt]
 $ sm compare FILE1.srt FILE2.srt
 
+# Verify subtitle files
+# sm verity [REFERENCE-FILE] [FILE2]
+$ sm verify ResidentAlienS01E01.eng.srt ResidentAlienS01E01.rus.srt
+
+Results
+==================
+ 
+Matched: 874/876 (99.8%)
+Missing in FILE2: 2
+Index offset detected: -2
+Missing subtitles:
+  [848] 00:41:39,497 --> 00:41:42,325 (not found in FILE2.srt)
+  [...] ...
+
 # Adjust timestamps
 # Delay in seconds
 # sm add-delay [FILE.srt] [DELAY]
-
-# Strip html tags, i.e. <i>, <b>, <u>, etc.
-# sm strip-tags [FILE.srt]
 ```
 
 ## Usage in chat with LLM
@@ -112,5 +126,6 @@ Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whateve
 
 ## RoadMap
 
-- Feature: mass-rename
+- Feature: sync
+- Feature: merge
 - Feature: adjust timestamps
