@@ -68,6 +68,7 @@ $ sm set ResidentAlienS01E01.srt 123 \
 $ sm add ResidentAlienS01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 
 # Import subtitles from csv file
+# Creates srt file if not exists
 # sm import [FILE.srt] [IMPORT.csv]
 $ sm import ResidentAlienS01E01.srt import.csv
 
