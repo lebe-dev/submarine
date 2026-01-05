@@ -97,6 +97,12 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::Verify { file1, file2 } => {
+                if let Err(e) = cmd::verify::handle(&file1, &file2) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");

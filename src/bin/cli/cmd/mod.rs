@@ -6,3 +6,4 @@ pub mod import;
 pub mod info;
 pub mod mass_rename;
 pub mod set;
+pub mod verify;

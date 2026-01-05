@@ -153,4 +153,15 @@ pub enum Commands {
         #[arg(value_name = "FILE2")]
         file2: String,
     },
+
+    /// Verify two subtitle files for index and timestamp discrepancies
+    Verify {
+        /// Path to the reference SRT file (FILE1)
+        #[arg(value_name = "FILE1")]
+        file1: String,
+
+        /// Path to the target SRT file to verify (FILE2)
+        #[arg(value_name = "FILE2")]
+        file2: String,
+    },
 }
