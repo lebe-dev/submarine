@@ -64,6 +64,32 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::MassRename {
+                file_mask,
+                dry_run,
+                force,
+                series_mode,
+                name,
+                season,
+                language,
+                separator,
+                file_template,
+            } => {
+                if let Err(e) = cmd::mass_rename::handle(
+                    &file_mask,
+                    dry_run,
+                    force,
+                    series_mode,
+                    name,
+                    season,
+                    language,
+                    &separator,
+                    &file_template,
+                ) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");

@@ -73,11 +73,18 @@ $ sm import ResidentAlienS01E01.srt import.csv
 sm doctor [--fix] [FILE.srt]
 
 # Mass rename
-# sm mass-rename [--dry-run] [--name="Resident Alien"] \
-#          [--series-mode] [--season=3] [--episodes=8] \
-#          [--language="ru"] \
+# - file-mask is case-insensitive
+# sm mass-rename [--dry-run] [--force] [--name="Resident Alien"] \
+#          [--series-mode] [--season=3] \
+#          [--language="rus"] \
 #          [--separator="."] \
+#          [--file-template="{{ name }}{{ separator }}S{{ season }}{{ separator }}E{{ episode }}.srt"] \
 #          [FILE-MASK]
+$ sm mass-rename --dry-run \
+          --name="Resident Alien" \
+          --series-mode --season=3 \
+          --separator="." \
+          "Resident"
 
 # Adjust timestamps
 # Delay in seconds

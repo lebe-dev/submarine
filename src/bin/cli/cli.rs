@@ -100,4 +100,46 @@ pub enum Commands {
         #[arg(long, default_value = "|")]
         delimiter: String,
     },
+
+    /// Mass rename subtitle files using templates
+    MassRename {
+        /// File mask for case-insensitive matching
+        #[arg(value_name = "FILE-MASK")]
+        file_mask: String,
+
+        /// Show preview without renaming
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip confirmation prompt
+        #[arg(long)]
+        force: bool,
+
+        /// Enable series mode with auto-incrementing episodes
+        #[arg(long)]
+        series_mode: bool,
+
+        /// Series/show name
+        #[arg(long)]
+        name: Option<String>,
+
+        /// Season number
+        #[arg(long)]
+        season: Option<u32>,
+
+        /// Language code
+        #[arg(long)]
+        language: Option<String>,
+
+        /// Separator character
+        #[arg(long, default_value = ".")]
+        separator: String,
+
+        /// File name template (Tera syntax)
+        #[arg(
+            long,
+            default_value = "{{ name }}{{ separator }}S{{ season }}{{ separator }}E{{ episode }}.srt"
+        )]
+        file_template: String,
+    },
 }
