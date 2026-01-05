@@ -133,14 +133,21 @@ where
 
 /// Render the UI layout
 fn ui(f: &mut Frame, app: &mut App) {
-    // Calculate viewport
-    let viewport_height = calculate_viewport_height(f.area());
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),    // Main comparison area
+            Constraint::Length(1), // Help text (1 line)
+        ])
+        .split(f.area());
+
+    let viewport_height = calculate_viewport_height(main_chunks[0]);
     update_scroll_offset(app, viewport_height);
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(f.area());
+        .split(main_chunks[0]);
 
     render_subtitle_pane(
         f,
@@ -161,6 +168,10 @@ fn ui(f: &mut Frame, app: &mut App) {
         app.scroll_offset,
         viewport_height,
     );
+
+    let help_text = Paragraph::new(" ↑/k: up | ↓/j: down | Esc/q: exit")
+        .style(Style::default().fg(Color::DarkGray));
+    f.render_widget(help_text, main_chunks[1]);
 }
 
 /// Render a single subtitle pane (left or right)
@@ -208,7 +219,7 @@ fn render_subtitle_pane(
 fn format_subtitle_item(subtitle: &Subtitle, is_selected: bool) -> ListItem<'static> {
     let style = if is_selected {
         Style::default()
-            .bg(Color::Yellow)
+            .bg(Color::Blue)
             .fg(Color::Black)
             .add_modifier(Modifier::BOLD)
     } else {
@@ -235,6 +246,7 @@ fn format_subtitle_item(subtitle: &Subtitle, is_selected: bool) -> ListItem<'sta
     let content = vec![
         Line::from(Span::styled(header.clone(), style)),
         Line::from(Span::styled(format!("  {}", display_text), style)),
+        Line::from(""), // Vertical spacing between subtitles
     ];
 
     ListItem::new(content).style(style)
@@ -244,7 +256,7 @@ fn format_subtitle_item(subtitle: &Subtitle, is_selected: bool) -> ListItem<'sta
 fn format_placeholder_item(is_selected: bool) -> ListItem<'static> {
     let style = if is_selected {
         Style::default()
-            .bg(Color::Yellow)
+            .bg(Color::Blue)
             .fg(Color::Black)
             .add_modifier(Modifier::BOLD)
     } else {
@@ -256,10 +268,10 @@ fn format_placeholder_item(is_selected: bool) -> ListItem<'static> {
 
 /// Calculate how many subtitles fit in the viewport
 fn calculate_viewport_height(size: Rect) -> usize {
-    // Account for borders (2 lines) and each subtitle takes ~2-3 lines
-    // Conservative estimate: 3 lines per subtitle
+    // Account for borders (2 lines) and each subtitle takes ~3-4 lines
+    // Conservative estimate: 4 lines per subtitle (header + text + spacing)
     let available_height = size.height.saturating_sub(2);
-    (available_height / 3).max(1) as usize
+    (available_height / 4).max(1) as usize
 }
 
 /// Update scroll offset to keep selected item visible
