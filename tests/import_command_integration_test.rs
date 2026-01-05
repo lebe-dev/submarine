@@ -491,7 +491,8 @@ fn test_import_path_traversal_srt_rejected() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("path traversal") || stderr.contains("failed to resolve"),
-        "Should reject path traversal attempt"
+        "Should reject path traversal attempt. stderr was: {}",
+        stderr
     );
 }
 
@@ -506,8 +507,9 @@ fn test_import_path_traversal_csv_rejected() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("failed to resolve"),
-        "Should reject path traversal attempt"
+        stderr.contains("path traversal") || stderr.contains("failed to resolve"),
+        "Should reject path traversal attempt. stderr was: {}",
+        stderr
     );
 }
 
