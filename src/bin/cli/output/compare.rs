@@ -34,6 +34,7 @@ pub struct App {
     jump_input: String,
     jump_error: Option<String>,
     should_quit: bool,
+    should_center_on_next_render: bool, // Flag to center view after jump
 }
 
 impl App {
@@ -55,6 +56,7 @@ impl App {
             jump_input: String::new(),
             jump_error: None,
             should_quit: false,
+            should_center_on_next_render: false,
         }
     }
 
@@ -126,6 +128,7 @@ impl App {
                         user_index, zero_based_index
                     );
                     self.selected_index = zero_based_index;
+                    self.should_center_on_next_render = true;
                     self.close_jump_dialog();
                 } else {
                     let max_subtitle = self.max_index() + 1;
@@ -315,7 +318,13 @@ fn ui(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     let viewport_height = calculate_viewport_height(main_chunks[0]);
-    update_scroll_offset(app, viewport_height);
+
+    if app.should_center_on_next_render {
+        center_selected_item(app, viewport_height);
+        app.should_center_on_next_render = false;
+    } else {
+        update_scroll_offset(app, viewport_height);
+    }
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -463,5 +472,21 @@ fn update_scroll_offset(app: &mut App, viewport_height: usize) {
     // If selected item is below viewport, scroll down
     else if app.selected_index >= app.scroll_offset + viewport_height {
         app.scroll_offset = app.selected_index.saturating_sub(viewport_height - 1);
+    }
+}
+
+/// Center the selected item in viewport (used after jump)
+fn center_selected_item(app: &mut App, viewport_height: usize) {
+    let max_len = app.subtitles1.len().max(app.subtitles2.len());
+
+    let half_viewport = viewport_height / 2;
+
+    if app.selected_index >= half_viewport {
+        let desired_offset = app.selected_index.saturating_sub(half_viewport);
+
+        let max_offset = max_len.saturating_sub(viewport_height);
+        app.scroll_offset = desired_offset.min(max_offset);
+    } else {
+        app.scroll_offset = 0;
     }
 }
