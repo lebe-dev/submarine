@@ -283,13 +283,16 @@ impl SubtitleService for SubRipService {
 
         let file_path = self.build_file_path(filename);
         debug!("checking file existence: {:?}", file_path);
-        if !file_path.exists() {
-            return Err(SubtitleError::FileNotFound(file_path.display().to_string()));
-        }
 
-        debug!("reading existing subtitles");
-        let mut subtitles = self.get_all(filename)?;
-        debug!("found {} existing subtitles", subtitles.len());
+        let mut subtitles = if file_path.exists() {
+            debug!("reading existing subtitles");
+            let subs = self.get_all(filename)?;
+            debug!("found {} existing subtitles", subs.len());
+            subs
+        } else {
+            info!("file does not exist, will create new file: {:?}", file_path);
+            Vec::new()
+        };
 
         let new_index = subtitles
             .iter()
@@ -324,9 +327,15 @@ impl SubtitleService for SubRipService {
         let new_subtitle = Subtitle::new(subtitle_index, start_time, end_time, text)
             .map_err(SubtitleError::ParseError)?;
 
-        info!("creating backup");
-        let backup_path = self.create_backup(&file_path)?;
-        debug!("backup created: {}", backup_path);
+        let backup_path = if file_path.exists() {
+            info!("creating backup");
+            let path = self.create_backup(&file_path)?;
+            debug!("backup created: {}", path);
+            path
+        } else {
+            info!("skipping backup for new file");
+            "N/A (new file)".to_string()
+        };
 
         subtitles.push(new_subtitle);
         debug!(
@@ -995,15 +1004,32 @@ mod tests {
     }
 
     #[test]
-    fn test_add_file_not_found() {
-        let (service, _temp_dir) = create_test_service();
+    fn test_add_creates_new_file() {
+        let (service, temp_dir) = create_test_service();
 
         let start = SubtitleTimestamp::try_new(Duration::milliseconds(1000)).unwrap();
         let end = SubtitleTimestamp::try_new(Duration::milliseconds(2000)).unwrap();
-        let text = SubtitleText::try_new("Text".to_string()).unwrap();
+        let text = SubtitleText::try_new("First subtitle".to_string()).unwrap();
 
-        let result = service.add("nonexistent.srt", start, end, text);
-        assert!(matches!(result, Err(SubtitleError::FileNotFound(_))));
+        let file_path = temp_dir.path().join("new_file.srt");
+        assert!(!file_path.exists());
+
+        let result = service.add("new_file.srt", start, end, text);
+        assert!(result.is_ok());
+
+        let report = result.unwrap();
+        assert_eq!(report.new_index, 1);
+        assert_eq!(report.total_subtitles, 1);
+        assert!(report.backup_path.contains("N/A"));
+
+        // Verify file was created
+        assert!(file_path.exists());
+
+        // Verify content
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains("1\n"));
+        assert!(content.contains("00:00:01,000 --> 00:00:02,000"));
+        assert!(content.contains("First subtitle"));
     }
 
     #[test]

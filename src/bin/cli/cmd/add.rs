@@ -11,39 +11,34 @@ pub fn handle(file: &str, timestamps: &str, text: &str) -> anyhow::Result<()> {
     let file_path = Path::new(file);
     debug!("parsing file path: {:?}", file_path);
 
-    if file_path.is_relative() {
+    // Resolve the path (works even if file doesn't exist)
+    let resolved_path = if file_path.is_relative() {
         let current_dir = std::env::current_dir()
             .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
+        current_dir.join(file_path)
+    } else {
+        file_path.to_path_buf()
+    };
+    debug!("resolved path: {:?}", resolved_path);
 
-        let resolved = current_dir.join(file_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", file_path);
-            return Err(anyhow::anyhow!(
-                "invalid file path: path traversal not allowed"
-            ));
-        }
+    // Path traversal protection: check if path contains ".."
+    if resolved_path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        error!("path traversal attempt detected: {:?}", file_path);
+        return Err(anyhow::anyhow!(
+            "invalid file path: path traversal not allowed"
+        ));
     }
 
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
+    let base_dir = resolved_path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("invalid file path"))?
         .to_path_buf();
     debug!("base directory: {:?}", base_dir);
 
-    let filename = canonical_path
+    let filename = resolved_path
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("invalid file name"))?
         .to_str()

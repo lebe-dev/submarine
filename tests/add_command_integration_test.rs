@@ -105,16 +105,34 @@ fn test_add_with_html_tags() {
 }
 
 #[test]
-fn test_add_file_not_found() {
+fn test_add_creates_new_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("new_file.srt");
+
+    // File doesn't exist yet - verify
+    assert!(!test_file.exists());
+
     let output = run_add_command(
-        "/tmp/nonexistent_file_12345.srt",
+        test_file.to_str().unwrap(),
         "00:00:01,000-00:00:03,000",
-        "Text",
+        "First subtitle in new file",
     );
 
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("error") || stderr.contains("failed to resolve file path"));
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✓ Subtitle added successfully"));
+    assert!(stdout.contains("New index: 1"));
+    assert!(stdout.contains("Total subtitles: 1"));
+    assert!(stdout.contains("N/A (new file)"));
+
+    // Verify file was created
+    assert!(test_file.exists());
+
+    // Verify file content
+    let content = fs::read_to_string(&test_file).unwrap();
+    assert!(content.contains("1\n"));
+    assert!(content.contains("00:00:01,000 --> 00:00:03,000"));
+    assert!(content.contains("First subtitle in new file"));
 }
 
 #[test]

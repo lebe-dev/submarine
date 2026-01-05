@@ -63,7 +63,8 @@ $ sm set ResidentAlienS01E01.srt 123 \
        --text "Okay"
 
 # Add subtitle to the end of file
-# Automatically increment index and makes backup    
+# Automatically increment index and makes backup
+# Creates srt file if not exists
 # sm add [FILE.srt] [START-END-TIMESTAMP] "[NEW-SUBTITLE]"
 $ sm add ResidentAlienS01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 
