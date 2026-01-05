@@ -99,6 +99,14 @@ pub enum Commands {
         /// CSV delimiter character (default: pipe '|')
         #[arg(long, default_value = "|")]
         delimiter: String,
+
+        /// Preview changes without modifying the file
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip confirmation prompt
+        #[arg(long)]
+        force: bool,
     },
 
     /// Mass rename subtitle files using templates
