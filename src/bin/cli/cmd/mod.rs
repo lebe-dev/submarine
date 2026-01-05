@@ -1,4 +1,5 @@
 pub mod add;
+pub mod compare;
 pub mod doctor;
 pub mod get;
 pub mod import;

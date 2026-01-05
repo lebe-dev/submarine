@@ -5,6 +5,7 @@ use logging::get_logging_config;
 pub mod cli;
 pub mod cmd;
 pub mod logging;
+pub mod output;
 
 fn main() {
     let cli = Cli::parse();
@@ -86,6 +87,12 @@ fn main() {
                     &separator,
                     &file_template,
                 ) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            Commands::Compare { file1, file2 } => {
+                if let Err(e) = cmd::compare::handle(&file1, &file2) {
                     eprintln!("error: {}", e);
                     std::process::exit(1);
                 }

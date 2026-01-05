@@ -86,6 +86,10 @@ $ sm mass-rename --dry-run \
           --separator="." \
           "Resident"
 
+# Compare subtitles in interactive mode
+# sm compare [FILE1.srt] [FILE2.srt]
+$ sm compare FILE1.srt FILE2.srt
+
 # Adjust timestamps
 # Delay in seconds
 # sm add-delay [FILE.srt] [DELAY]

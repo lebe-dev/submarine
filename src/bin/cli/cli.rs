@@ -142,4 +142,15 @@ pub enum Commands {
         )]
         file_template: String,
     },
+
+    /// Compare two SRT files side-by-side in TUI mode
+    Compare {
+        /// Path to the first SRT file
+        #[arg(value_name = "FILE1")]
+        file1: String,
+
+        /// Path to the second SRT file
+        #[arg(value_name = "FILE2")]
+        file2: String,
+    },
 }
