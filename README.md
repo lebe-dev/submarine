@@ -50,10 +50,6 @@ First subtitle
 00:06:56,111 --> 00:06:57,678
 Second subtitle
 
-# Alternative: use get-range command explicitly
-# sm get-range [FILE.srt] [START-END]
-$ sm get-range FILE.srt 123-125
-
 # Set subtitle for index
 # sm set [FILE.srt] [INDEX] \
 #       [--start=00:00:03,481] \
@@ -107,4 +103,3 @@ Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whateve
 
 - Feature: mass-rename
 - Feature: adjust timestamps
-- Feature: auto-backups

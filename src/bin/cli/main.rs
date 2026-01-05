@@ -20,12 +20,6 @@ fn main() {
                     std::process::exit(1);
                 }
             }
-            Commands::GetRange { file, range } => {
-                if let Err(e) = cmd::get_range::handle(&file, &range) {
-                    eprintln!("error: {}", e);
-                    std::process::exit(1);
-                }
-            }
             Commands::Set {
                 file,
                 index,

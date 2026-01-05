@@ -264,3 +264,189 @@ fn test_get_with_invalid_index() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("Invalid index"));
 }
+
+// ========== Additional Range Test Cases ==========
+
+#[test]
+fn test_get_range_partial_overlap() {
+    let file = test_data_path("valid/complex.srt");
+
+    // File has indices 1, 2, 5, 6, ...
+    // Request 2-4 should only return subtitle 2
+    let output = run_get_command(&file, "2-4");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should contain subtitle 2
+    assert!(stdout.contains("2\n"));
+    assert!(stdout.contains("00:00:03,481 --> 00:00:05,135"));
+    assert!(stdout.contains("Hello, Harry."));
+
+    // Should NOT contain subtitle 1
+    assert!(!stdout.contains("Previously on"));
+
+    // Should NOT contain subtitle 5
+    assert!(!stdout.contains("You should be"));
+}
+
+#[test]
+fn test_get_range_no_subtitles() {
+    let file = test_data_path("valid/complex.srt");
+
+    // File has indices 1, 2, 5, 6, ... (no 3, 4)
+    // Request 3-4 should return empty result
+    let output = run_get_command(&file, "3-4");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(stdout.contains("No subtitles found in range 3-4"));
+}
+
+#[test]
+fn test_get_range_subset() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Request range 1-2 (first two of three)
+    let output = run_get_command(&file, "1-2");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should contain subtitles 1 and 2
+    assert!(stdout.contains("First subtitle"));
+    assert!(stdout.contains("Second subtitle"));
+
+    // Should NOT contain subtitle 3
+    assert!(!stdout.contains("Third subtitle"));
+}
+
+#[test]
+fn test_get_range_with_html_tags() {
+    let file = test_data_path("valid/complex.srt");
+
+    // Get range that includes subtitles with HTML
+    let output = run_get_command(&file, "1-2");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should preserve HTML tags
+    assert!(stdout.contains("<i>Previously on"));
+    assert!(stdout.contains("\"Resident Alien\"...</i>"));
+    assert!(stdout.contains("Hello, Harry."));
+}
+
+#[test]
+fn test_get_range_multiline_text() {
+    let file = test_data_path("valid/complex.srt");
+
+    // Subtitle 1 has multiline text
+    let output = run_get_command(&file, "1-1");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should contain both lines
+    assert!(stdout.contains("Previously on"));
+    assert!(stdout.contains("Resident Alien"));
+}
+
+#[test]
+fn test_get_range_beyond_end() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Request range 2-100 (only 2 and 3 exist)
+    let output = run_get_command(&file, "2-100");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should contain subtitles 2 and 3
+    assert!(stdout.contains("Second subtitle"));
+    assert!(stdout.contains("Third subtitle"));
+
+    // Should NOT contain subtitle 1
+    assert!(!stdout.contains("First subtitle"));
+}
+
+#[test]
+fn test_get_range_start_zero() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Start index 0 is invalid (SRT indices start at 1)
+    let output = run_get_command(&file, "0-5");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(stderr.contains("error"));
+    assert!(stderr.contains("Start index must be >= 1"));
+}
+
+#[test]
+fn test_get_range_end_zero() {
+    let file = test_data_path("valid/simple.srt");
+
+    // End index 0 is invalid
+    let output = run_get_command(&file, "1-0");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(stderr.contains("error"));
+    // Will fail on either end validation OR range order validation
+    assert!(stderr.contains("End index must be >= 1") || stderr.contains("Start index must be <="));
+}
+
+#[test]
+fn test_get_range_empty_file() {
+    let file = test_data_path("invalid/empty.srt");
+
+    let output = run_get_command(&file, "1-5");
+    assert!(output.status.success()); // Empty file is valid, just returns "No subtitles found"
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(stdout.contains("No subtitles found in range 1-5"));
+}
+
+#[test]
+fn test_get_range_output_format() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Get range 1-2 and verify SRT formatting
+    let output = run_get_command(&file, "1-2");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should have proper SRT format with double newlines between subtitles
+    // Verify structure: index, timestamp, text, blank line, next subtitle
+    let lines: Vec<&str> = stdout.lines().collect();
+
+    // Find subtitle 1
+    let idx1_pos = lines.iter().position(|&l| l == "1").unwrap();
+    assert!(lines[idx1_pos + 1].contains("00:00:01,000 --> 00:00:03,000"));
+    assert!(lines[idx1_pos + 2].contains("First subtitle"));
+
+    // There should be a blank line after subtitle 1
+    assert_eq!(lines[idx1_pos + 3], "");
+
+    // Find subtitle 2
+    let idx2_pos = lines.iter().position(|&l| l == "2").unwrap();
+    assert!(lines[idx2_pos + 1].contains("00:00:03,500 --> 00:00:05,500"));
+    assert!(lines[idx2_pos + 2].contains("Second subtitle"));
+}
+
+#[test]
+fn test_get_range_invalid_format_variations() {
+    let file = test_data_path("valid/simple.srt");
+
+    // Test various invalid formats
+    let output = run_get_command(&file, "123-");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Invalid"));
+
+    let output = run_get_command(&file, "abc-123");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Invalid"));
+
+    let output = run_get_command(&file, "123-abc");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Invalid"));
+}
