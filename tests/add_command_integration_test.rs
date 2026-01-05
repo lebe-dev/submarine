@@ -195,11 +195,11 @@ fn test_add_backup_created() {
     // Extract backup path from stdout
     let backup_line = stdout
         .lines()
-        .find(|line| line.contains("Backup created:"))
+        .find(|line| line.contains("Backup:"))
         .expect("Backup line not found");
 
     // Backup file should exist
-    let backup_path_str = backup_line.replace("Backup created:", "");
+    let backup_path_str = backup_line.replace("Backup:", "");
     let backup_path_trimmed = backup_path_str.trim();
     let backup_path = PathBuf::from(backup_path_trimmed);
     assert!(

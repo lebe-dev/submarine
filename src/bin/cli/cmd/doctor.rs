@@ -1,3 +1,5 @@
+use lib::backup::ports::BackupService;
+use lib::backup::service::SubRipBackupService;
 use lib::doctor::model::DoctorError;
 use lib::doctor::ports::DoctorService;
 use lib::doctor::service::SubRipDoctorService;
@@ -32,11 +34,31 @@ pub fn handle(file: &str, fix: bool) -> anyhow::Result<()> {
     let service = SubRipDoctorService::new(base_dir);
 
     if fix {
-        // Fix mode
+        // Fix mode - create backup before fixing
+        let backup_service = SubRipBackupService::new();
+        let backup_result = backup_service.create_backup(&canonical_path);
+
+        let backup_path = match backup_result {
+            Ok(Some(path)) => {
+                debug!("backup created: {}", path);
+                path
+            }
+            Ok(None) => {
+                error!("file does not exist, cannot fix");
+                eprintln!("error: File does not exist: {}", file);
+                std::process::exit(1);
+            }
+            Err(e) => {
+                error!("failed to create backup: {}", e);
+                eprintln!("error: Failed to create backup: {}", e);
+                std::process::exit(1);
+            }
+        };
+
         match service.fix(&filename) {
             Ok(report) => {
                 info!("исправление завершено успешно");
-                print_fix_report(&report);
+                print_fix_report(&report, &backup_path);
                 Ok(())
             }
             Err(e) => {
@@ -119,11 +141,11 @@ fn print_diagnostic_report(report: &lib::doctor::model::DiagnosticReport) {
     }
 }
 
-fn print_fix_report(report: &lib::doctor::model::FixReport) {
+fn print_fix_report(report: &lib::doctor::model::FixReport, backup_path: &str) {
     println!("Fixing: {}", report.original_path);
     println!();
 
-    println!("✓ Backup created: {}", report.backup_path);
+    println!("✓ Backup: {}", backup_path);
 
     if report.issues_fixed > 0 {
         println!(

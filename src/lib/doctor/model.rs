@@ -66,8 +66,6 @@ pub struct DiagnosticReport {
 pub struct FixReport {
     /// Path to the original file
     pub original_path: String,
-    /// Path to the backup file
-    pub backup_path: String,
     /// Path to the fixed file (same as original)
     pub fixed_path: String,
     /// Number of issues fixed

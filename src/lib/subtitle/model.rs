@@ -248,7 +248,6 @@ impl SubtitleUpdate {
 #[derive(Debug, Clone)]
 pub struct UpdateReport {
     pub file_path: String,
-    pub backup_path: String,
     pub subtitle_index: u32,
     pub fields_updated: Vec<String>,
 }
@@ -257,7 +256,6 @@ pub struct UpdateReport {
 #[derive(Debug, Clone)]
 pub struct AddReport {
     pub file_path: String,
-    pub backup_path: String,
     pub new_index: u32,
     pub total_subtitles: usize,
 }

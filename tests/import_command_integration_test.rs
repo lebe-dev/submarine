@@ -432,16 +432,16 @@ fn test_import_creates_backup() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Last backup:"));
+    assert!(stdout.contains("Backup:"));
 
     // Backups are created in backups/ relative to current directory (project root)
     // Extract backup path from stdout
     let backup_line = stdout
         .lines()
-        .find(|line| line.contains("Last backup:"))
+        .find(|line| line.contains("Backup:"))
         .expect("Backup line not found");
 
-    let backup_path_str = backup_line.replace("Last backup:", "").trim().to_string();
+    let backup_path_str = backup_line.replace("Backup:", "").trim().to_string();
     let backup_path = PathBuf::from(&backup_path_str);
 
     assert!(

@@ -4,7 +4,6 @@ use crate::doctor::model::{
 use crate::doctor::ports::DoctorService;
 use crate::subtitle::ports::SubtitleService;
 use crate::subtitle::service::SubRipService;
-use chrono::Local;
 use log::{debug, error, info};
 use std::fs;
 use std::path::PathBuf;
@@ -312,17 +311,6 @@ impl DoctorService for SubRipDoctorService {
 
         let file_path = self.get_file_path(filename)?;
 
-        let timestamp = Local::now().format("%Y-%m-%d-%H-%M-%S");
-        let backup_path = format!("{}.bak-{}", file_path.display(), timestamp);
-        debug!("creating backup: {}", backup_path);
-
-        fs::copy(&file_path, &backup_path).map_err(|e| {
-            error!("failed to create backup: {}", e);
-            DoctorError::BackupFailed(format!("{}", e))
-        })?;
-
-        info!("backup created: {}", backup_path);
-
         let content = fs::read_to_string(&file_path)?;
         let lines: Vec<&str> = content.lines().collect();
 
@@ -400,7 +388,6 @@ impl DoctorService for SubRipDoctorService {
 
         Ok(FixReport {
             original_path: file_path.display().to_string(),
-            backup_path,
             fixed_path: file_path.display().to_string(),
             issues_fixed,
             issues_unfixable: unfixable_issues.len(),

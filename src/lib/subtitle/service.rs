@@ -4,7 +4,6 @@ use crate::subtitle::model::{
 };
 use crate::subtitle::ports::SubtitleService;
 use anyhow::{Context, Result, bail};
-use chrono::Local;
 use log::{debug, info};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -141,37 +140,6 @@ impl SubRipService {
             .collect::<Vec<String>>()
             .join("\n\n")
     }
-
-    /// Create backup file with timestamp in backups/ subdirectory
-    fn create_backup(&self, file_path: &Path) -> Result<String, SubtitleError> {
-        debug!("creating backup for file: {:?}", file_path);
-
-        let backups_dir = PathBuf::from("backups");
-        debug!("ensuring backups directory exists: {:?}", backups_dir);
-        fs::create_dir_all(&backups_dir).map_err(|e| {
-            SubtitleError::BackupFailed(format!("failed to create backups directory: {}", e))
-        })?;
-
-        let filename = file_path
-            .file_name()
-            .ok_or_else(|| SubtitleError::BackupFailed("invalid file path".to_string()))?;
-
-        let now = Local::now();
-        let timestamp = format!(
-            "{}.{:06}",
-            now.format("%Y-%m-%d_%H-%M-%S"),
-            now.timestamp_subsec_micros()
-        );
-        let backup_filename = format!("{}.{}", filename.to_string_lossy(), timestamp);
-        let backup_path = backups_dir.join(backup_filename);
-
-        debug!("copying file to backup: {:?}", backup_path);
-        fs::copy(file_path, &backup_path)
-            .map_err(|e| SubtitleError::BackupFailed(e.to_string()))?;
-
-        info!("backup created: {}", backup_path.display());
-        Ok(backup_path.display().to_string())
-    }
 }
 
 impl SubtitleService for SubRipService {
@@ -239,8 +207,6 @@ impl SubtitleService for SubRipService {
 
         subtitles[subtitle_pos] = updated_subtitle;
 
-        let backup_path = self.create_backup(&file_path)?;
-
         let content = Self::serialize_to_srt(&subtitles);
         fs::write(&file_path, content).map_err(|e| SubtitleError::WriteFailed(e.to_string()))?;
 
@@ -257,7 +223,6 @@ impl SubtitleService for SubRipService {
 
         Ok(UpdateReport {
             file_path: file_path.display().to_string(),
-            backup_path,
             subtitle_index: id,
             fields_updated,
         })
@@ -327,16 +292,6 @@ impl SubtitleService for SubRipService {
         let new_subtitle = Subtitle::new(subtitle_index, start_time, end_time, text)
             .map_err(SubtitleError::ParseError)?;
 
-        let backup_path = if file_path.exists() {
-            info!("creating backup");
-            let path = self.create_backup(&file_path)?;
-            debug!("backup created: {}", path);
-            path
-        } else {
-            info!("skipping backup for new file");
-            "N/A (new file)".to_string()
-        };
-
         subtitles.push(new_subtitle);
         debug!(
             "added subtitle to collection, total count: {}",
@@ -352,7 +307,6 @@ impl SubtitleService for SubRipService {
         info!("subtitle added successfully with index {}", new_index);
         Ok(AddReport {
             file_path: file_path.display().to_string(),
-            backup_path,
             new_index,
             total_subtitles: subtitles.len(),
         })
@@ -705,7 +659,6 @@ mod tests {
         let report = service.set("test.srt", 1, update).unwrap();
         assert_eq!(report.subtitle_index, 1);
         assert_eq!(report.fields_updated, vec!["text"]);
-        assert!(report.backup_path.contains(".srt."));
 
         let subtitle = service.get_by_id("test.srt", 1).unwrap().unwrap();
         assert_eq!(subtitle.text.as_ref(), "Updated text");
@@ -826,18 +779,9 @@ mod tests {
 
         let report = service.set("test.srt", 1, update).unwrap();
 
-        // Verify backup path is in backups/ subdirectory
-        assert!(report.backup_path.starts_with("backups/"));
-        assert!(report.backup_path.contains("test.srt."));
-
-        // Verify backup exists
-        let backup_path = PathBuf::from(&report.backup_path);
-        assert!(backup_path.exists());
-
-        // Verify backup contains original content
-        let backup_content = fs::read_to_string(&backup_path).unwrap();
-        assert!(backup_content.contains("Text"));
-        assert!(!backup_content.contains("New"));
+        // Verify fields were updated
+        assert_eq!(report.subtitle_index, 1);
+        assert_eq!(report.fields_updated, vec!["text"]);
     }
 
     #[test]
@@ -989,18 +933,9 @@ mod tests {
 
         let report = service.add("test.srt", start, end, text).unwrap();
 
-        // Verify backup path is in backups/ subdirectory
-        assert!(report.backup_path.starts_with("backups/"));
-        assert!(report.backup_path.contains("test.srt."));
-
-        // Verify backup exists
-        let backup_path = PathBuf::from(&report.backup_path);
-        assert!(backup_path.exists());
-
-        // Verify backup contains only original content (1 subtitle)
-        let backup_content = fs::read_to_string(&backup_path).unwrap();
-        let backup_subs = SubRipService::parse_srt_file(&backup_content).unwrap();
-        assert_eq!(backup_subs.len(), 1);
+        // Verify the subtitle was added
+        assert_eq!(report.new_index, 2);
+        assert_eq!(report.total_subtitles, 2);
     }
 
     #[test]
@@ -1020,7 +955,6 @@ mod tests {
         let report = result.unwrap();
         assert_eq!(report.new_index, 1);
         assert_eq!(report.total_subtitles, 1);
-        assert!(report.backup_path.contains("N/A"));
 
         // Verify file was created
         assert!(file_path.exists());

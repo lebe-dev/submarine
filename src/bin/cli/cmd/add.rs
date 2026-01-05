@@ -1,3 +1,5 @@
+use lib::backup::ports::BackupService;
+use lib::backup::service::SubRipBackupService;
 use lib::subtitle::model::{Subtitle, SubtitleError, SubtitleText, SubtitleTimestamp};
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
@@ -80,7 +82,27 @@ pub fn handle(file: &str, timestamps: &str, text: &str) -> anyhow::Result<()> {
     let subtitle_text = SubtitleText::try_new(text.to_string())
         .map_err(|e| anyhow::anyhow!("invalid text: {}", e))?;
 
-    // 6. Create service and execute add
+    // 6. Create backup before modifying the file
+    let backup_service = SubRipBackupService::new();
+    let backup_result = backup_service.create_backup(&resolved_path);
+
+    let backup_path = match backup_result {
+        Ok(Some(path)) => {
+            debug!("backup created: {}", path);
+            path
+        }
+        Ok(None) => {
+            debug!("file does not exist, skipping backup");
+            "N/A (new file)".to_string()
+        }
+        Err(e) => {
+            error!("failed to create backup: {}", e);
+            eprintln!("error: Failed to create backup: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // 7. Create service and execute add
     let service = SubRipService::new(base_dir);
 
     debug!("adding new subtitle...");
@@ -90,13 +112,12 @@ pub fn handle(file: &str, timestamps: &str, text: &str) -> anyhow::Result<()> {
                 "subtitle added successfully with index {}",
                 report.new_index
             );
-            debug!("backup created: {}", report.backup_path);
 
             println!("✓ Subtitle added successfully");
             println!();
             println!("New index: {}", report.new_index);
             println!("Total subtitles: {}", report.total_subtitles);
-            println!("Backup created: {}", report.backup_path);
+            println!("Backup: {}", backup_path);
 
             Ok(())
         }

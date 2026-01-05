@@ -1,3 +1,5 @@
+use lib::backup::ports::BackupService;
+use lib::backup::service::SubRipBackupService;
 use lib::import::ports::ImportService;
 use lib::import::service::CsvImportService;
 use lib::subtitle::model::{Subtitle, SubtitleError, SubtitleText, SubtitleTimestamp};
@@ -116,14 +118,33 @@ pub fn handle(srt_file: &str, csv_file: &str, delimiter: &str) -> anyhow::Result
         std::process::exit(1);
     }
 
-    // 5. Create service and execute import
+    // 5. Create backup before importing (one backup for the entire import operation)
+    let backup_service = SubRipBackupService::new();
+    let backup_result = backup_service.create_backup(&canonical_srt_path);
+
+    let backup_path = match backup_result {
+        Ok(Some(path)) => {
+            debug!("backup created: {}", path);
+            path
+        }
+        Ok(None) => {
+            debug!("file does not exist, skipping backup");
+            "N/A (new file)".to_string()
+        }
+        Err(e) => {
+            error!("failed to create backup: {}", e);
+            eprintln!("error: Failed to create backup: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // 6. Create service and execute import
     let service = SubRipService::new(base_dir);
 
     debug!("converting and adding {} subtitles...", csv_rows.len());
     let mut added_count = 0;
     let mut start_index = None;
     let mut end_index = None;
-    let mut last_backup_path = None;
 
     for csv_row in csv_rows {
         // Parse timestamps
@@ -207,9 +228,11 @@ pub fn handle(srt_file: &str, csv_file: &str, delimiter: &str) -> anyhow::Result
                     start_index = Some(report.new_index);
                 }
                 end_index = Some(report.new_index);
-                last_backup_path = Some(report.backup_path);
                 added_count += 1;
-                debug!("added subtitle {} (index {})", added_count, report.new_index);
+                debug!(
+                    "added subtitle {} (index {})",
+                    added_count, report.new_index
+                );
             }
             Err(e) => {
                 error!(
@@ -244,9 +267,7 @@ pub fn handle(srt_file: &str, csv_file: &str, delimiter: &str) -> anyhow::Result
         end_index.unwrap_or(0)
     );
     println!("Total subtitles: {}", total_subtitles);
-    if let Some(backup) = last_backup_path {
-        println!("Last backup: {}", backup);
-    }
+    println!("Backup: {}", backup_path);
 
     Ok(())
 }

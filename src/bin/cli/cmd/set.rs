@@ -1,3 +1,5 @@
+use lib::backup::ports::BackupService;
+use lib::backup::service::SubRipBackupService;
 use lib::subtitle::model::{
     Subtitle, SubtitleError, SubtitleText, SubtitleTimestamp, SubtitleUpdate,
 };
@@ -103,18 +105,38 @@ pub fn handle(
         text: subtitle_text,
     };
 
-    // 6. Create service and execute update
+    // 6. Create backup before modifying the file
+    let backup_service = SubRipBackupService::new();
+    let backup_result = backup_service.create_backup(&canonical_path);
+
+    let backup_path = match backup_result {
+        Ok(Some(path)) => {
+            debug!("backup created: {}", path);
+            path
+        }
+        Ok(None) => {
+            error!("file does not exist, cannot update");
+            eprintln!("error: File does not exist: {}", file);
+            std::process::exit(1);
+        }
+        Err(e) => {
+            error!("failed to create backup: {}", e);
+            eprintln!("error: Failed to create backup: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // 7. Create service and execute update
     let service = SubRipService::new(base_dir);
 
     debug!("updating subtitle {}...", index);
     match service.set(&filename, index, update) {
         Ok(report) => {
             info!("subtitle {} updated successfully", index);
-            debug!("backup created: {}", report.backup_path);
 
             println!("✓ Subtitle {} updated successfully", index);
             println!();
-            println!("Backup created: {}", report.backup_path);
+            println!("Backup: {}", backup_path);
             println!("Fields updated: {}", report.fields_updated.join(", "));
 
             Ok(())
