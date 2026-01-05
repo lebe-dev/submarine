@@ -10,11 +10,17 @@ use crossterm::{
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
 };
+
+/// Application mode for state machine
+enum AppMode {
+    Normal,
+    JumpDialog,
+}
 
 /// Application state for the TUI comparison view
 pub struct App {
@@ -24,6 +30,10 @@ pub struct App {
     filename2: String,
     selected_index: usize, // 0-based index for current selection
     scroll_offset: usize,  // Top visible subtitle index for scrolling
+    mode: AppMode,
+    jump_input: String,
+    jump_error: Option<String>,
+    should_quit: bool,
 }
 
 impl App {
@@ -41,6 +51,10 @@ impl App {
             filename2,
             selected_index: 0,
             scroll_offset: 0,
+            mode: AppMode::Normal,
+            jump_input: String::new(),
+            jump_error: None,
+            should_quit: false,
         }
     }
 
@@ -62,6 +76,68 @@ impl App {
     fn previous(&mut self) {
         if self.selected_index > 0 {
             self.selected_index -= 1;
+        }
+    }
+
+    /// Open the jump dialog
+    fn open_jump_dialog(&mut self) {
+        self.mode = AppMode::JumpDialog;
+        self.jump_input.clear();
+        self.jump_error = None;
+    }
+
+    /// Close the jump dialog without jumping
+    fn close_jump_dialog(&mut self) {
+        self.mode = AppMode::Normal;
+        self.jump_input.clear();
+        self.jump_error = None;
+    }
+
+    /// Add a character to the jump input
+    fn input_char(&mut self, c: char) {
+        if c.is_ascii_digit() {
+            self.jump_input.push(c);
+            self.jump_error = None; // Clear error on new input
+        }
+    }
+
+    /// Remove the last character from the jump input
+    fn input_backspace(&mut self) {
+        self.jump_input.pop();
+        self.jump_error = None;
+    }
+
+    /// Validate input and jump to subtitle if valid
+    fn try_jump(&mut self) {
+        if self.jump_input.is_empty() {
+            self.jump_error = Some("please enter a subtitle number".to_string());
+            return;
+        }
+
+        match self.jump_input.parse::<usize>() {
+            Ok(user_index) if user_index == 0 => {
+                self.jump_error = Some("subtitle numbers start at 1".to_string());
+            }
+            Ok(user_index) => {
+                let zero_based_index = user_index - 1;
+                if zero_based_index <= self.max_index() {
+                    debug!(
+                        "jumping to subtitle {} (index {})",
+                        user_index, zero_based_index
+                    );
+                    self.selected_index = zero_based_index;
+                    self.close_jump_dialog();
+                } else {
+                    let max_subtitle = self.max_index() + 1;
+                    self.jump_error = Some(format!(
+                        "subtitle {} not found (max: {})",
+                        user_index, max_subtitle
+                    ));
+                }
+            }
+            Err(_) => {
+                self.jump_error = Some("invalid number".to_string());
+            }
         }
     }
 }
@@ -109,26 +185,123 @@ where
 
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Esc | KeyCode::Char('q') => {
-                        debug!("exit key pressed");
-                        return Ok(());
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        debug!("navigating down to index {}", app.selected_index + 1);
-                        app.next();
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        if app.selected_index > 0 {
-                            debug!("navigating up to index {}", app.selected_index - 1);
-                        }
-                        app.previous();
-                    }
-                    _ => {}
+                match app.mode {
+                    AppMode::Normal => handle_normal_mode_input(app, key.code),
+                    AppMode::JumpDialog => handle_dialog_mode_input(app, key.code),
                 }
             }
         }
+
+        if app.should_quit {
+            return Ok(());
+        }
     }
+}
+
+/// Handle keyboard input in normal mode
+fn handle_normal_mode_input(app: &mut App, key_code: KeyCode) {
+    match key_code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            debug!("exit key pressed");
+            app.should_quit = true;
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            debug!("navigating down to index {}", app.selected_index + 1);
+            app.next();
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            if app.selected_index > 0 {
+                debug!("navigating up to index {}", app.selected_index - 1);
+            }
+            app.previous();
+        }
+        KeyCode::Char('g') => {
+            debug!("opening jump dialog");
+            app.open_jump_dialog();
+        }
+        _ => {}
+    }
+}
+
+/// Handle keyboard input in jump dialog mode
+fn handle_dialog_mode_input(app: &mut App, key_code: KeyCode) {
+    match key_code {
+        KeyCode::Esc => {
+            debug!("closing jump dialog (cancelled)");
+            app.close_jump_dialog();
+        }
+        KeyCode::Enter => {
+            debug!("attempting to jump to subtitle: {}", app.jump_input);
+            app.try_jump();
+        }
+        KeyCode::Char(c) if c.is_ascii_digit() => {
+            app.input_char(c);
+        }
+        KeyCode::Backspace => {
+            app.input_backspace();
+        }
+        _ => {}
+    }
+}
+
+/// Calculate a centered rectangle for the popup dialog
+fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
+}
+
+/// Render the jump dialog overlay
+fn render_jump_dialog(f: &mut Frame, app: &App) {
+    let area = popup_area(f.area(), 40, 25);
+
+    f.render_widget(Clear, area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([
+            Constraint::Length(1), // Title
+            Constraint::Length(1), // Spacing
+            Constraint::Length(1), // Input label
+            Constraint::Length(3), // Input box
+            Constraint::Length(1), // Error message
+            Constraint::Length(1), // Spacing
+            Constraint::Length(1), // Help text
+        ])
+        .split(area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White))
+        .title(" Jump to Subtitle ");
+    f.render_widget(block, area);
+
+    let title = Paragraph::new("Enter subtitle number:");
+    f.render_widget(title, chunks[2]);
+
+    let input_text = if app.jump_input.is_empty() {
+        "_".to_string()
+    } else {
+        app.jump_input.clone()
+    };
+
+    let input = Paragraph::new(input_text)
+        .block(Block::default().borders(Borders::ALL))
+        .style(Style::default().fg(Color::Yellow));
+    f.render_widget(input, chunks[3]);
+
+    if let Some(error) = &app.jump_error {
+        let error_msg = Paragraph::new(error.as_str()).style(Style::default().fg(Color::Red));
+        f.render_widget(error_msg, chunks[4]);
+    }
+
+    let help = Paragraph::new("Enter: jump | Esc: cancel")
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+    f.render_widget(help, chunks[6]);
 }
 
 /// Render the UI layout
@@ -169,9 +342,16 @@ fn ui(f: &mut Frame, app: &mut App) {
         viewport_height,
     );
 
-    let help_text = Paragraph::new(" ↑/k: up | ↓/j: down | Esc/q: exit")
-        .style(Style::default().fg(Color::DarkGray));
+    let help_text_str = match app.mode {
+        AppMode::Normal => " ↑/k: up | ↓/j: down | g: jump | Esc/q: exit",
+        AppMode::JumpDialog => "", // Help shown in dialog
+    };
+    let help_text = Paragraph::new(help_text_str).style(Style::default().fg(Color::DarkGray));
     f.render_widget(help_text, main_chunks[1]);
+
+    if matches!(app.mode, AppMode::JumpDialog) {
+        render_jump_dialog(f, app);
+    }
 }
 
 /// Render a single subtitle pane (left or right)
