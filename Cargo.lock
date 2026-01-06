@@ -1770,6 +1770,7 @@ dependencies = [
  "log",
  "log4rs",
  "nutype",
+ "rand 0.8.5",
  "ratatui",
  "tempfile",
  "tera",

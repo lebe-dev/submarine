@@ -35,6 +35,7 @@ pub struct App {
     jump_error: Option<String>,
     should_quit: bool,
     should_center_on_next_render: bool, // Flag to center view after jump
+    pending_g_press: bool,              // Track first 'g' press for 'gg' sequence
 }
 
 impl App {
@@ -57,6 +58,7 @@ impl App {
             jump_error: None,
             should_quit: false,
             should_center_on_next_render: false,
+            pending_g_press: false,
         }
     }
 
@@ -143,6 +145,38 @@ impl App {
             }
         }
     }
+
+    /// Jump to first subtitle (index 0)
+    fn jump_to_first(&mut self) {
+        debug!("jumping to first subtitle");
+        self.selected_index = 0;
+        self.should_center_on_next_render = true;
+    }
+
+    /// Jump to last subtitle
+    fn jump_to_last(&mut self) {
+        let max = self.max_index();
+        debug!("jumping to last subtitle (index {})", max);
+        self.selected_index = max;
+        self.should_center_on_next_render = true;
+    }
+
+    /// Jump to random subtitle
+    fn jump_to_random(&mut self) {
+        use rand::Rng;
+
+        let max_len = self.subtitles1.len().max(self.subtitles2.len());
+        if max_len == 0 {
+            return; // No subtitles to jump to
+        }
+
+        let max = self.max_index();
+        let mut rng = rand::thread_rng();
+        let random_index = rng.gen_range(0..=max);
+        debug!("jumping to random subtitle (index {})", random_index);
+        self.selected_index = random_index;
+        self.should_center_on_next_render = true;
+    }
 }
 
 /// Public API: Run the TUI comparison interface
@@ -203,6 +237,28 @@ where
 
 /// Handle keyboard input in normal mode
 fn handle_normal_mode_input(app: &mut App, key_code: KeyCode) {
+    if app.pending_g_press {
+        app.pending_g_press = false;
+
+        match key_code {
+            KeyCode::Char('g') => {
+                // 'gg' sequence detected - jump to first
+                app.jump_to_first();
+                return;
+            }
+            KeyCode::Char(c) if c.is_ascii_digit() => {
+                debug!("opening jump dialog and processing digit {}", c);
+                app.open_jump_dialog();
+                app.input_char(c);
+                return;
+            }
+            _ => {
+                debug!("opening jump dialog (from pending g)");
+                app.open_jump_dialog();
+            }
+        }
+    }
+
     match key_code {
         KeyCode::Esc | KeyCode::Char('q') => {
             debug!("exit key pressed");
@@ -219,8 +275,17 @@ fn handle_normal_mode_input(app: &mut App, key_code: KeyCode) {
             app.previous();
         }
         KeyCode::Char('g') => {
-            debug!("opening jump dialog");
-            app.open_jump_dialog();
+            // First 'g' press - set pending state
+            debug!("g pressed, waiting for second key");
+            app.pending_g_press = true;
+        }
+        KeyCode::Char('G') => {
+            // Shift+G - jump to last
+            app.jump_to_last();
+        }
+        KeyCode::Char('r') => {
+            // r - jump to random
+            app.jump_to_random();
         }
         _ => {}
     }
@@ -352,7 +417,10 @@ fn ui(f: &mut Frame, app: &mut App) {
     );
 
     let help_text_str = match app.mode {
-        AppMode::Normal => " ↑/k: up | ↓/j: down | g: jump | Esc/q: exit",
+        AppMode::Normal if app.pending_g_press => {
+            " Waiting for second key... (g: first | other: cancel)"
+        }
+        AppMode::Normal => " j/k: move | g: jump | gg: first | G: last | r: random | q: quit",
         AppMode::JumpDialog => "", // Help shown in dialog
     };
     let help_text = Paragraph::new(help_text_str).style(Style::default().fg(Color::DarkGray));
