@@ -10,16 +10,17 @@ use crossterm::{
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 
 /// Application mode for state machine
 enum AppMode {
     Normal,
-    JumpDialog,
+    JumpInput,   // : followed by number input
+    SearchInput, // / followed by search text input
 }
 
 /// Application state for the TUI comparison view
@@ -31,8 +32,10 @@ pub struct App {
     selected_index: usize, // 0-based index for current selection
     scroll_offset: usize,  // Top visible subtitle index for scrolling
     mode: AppMode,
-    jump_input: String,
-    jump_error: Option<String>,
+    input_buffer: String,               // Buffer for : and / input
+    input_error: Option<String>,        // Error message for invalid input
+    search_matches: Vec<usize>,         // Indices of subtitles matching search
+    current_match_index: Option<usize>, // Current position in search_matches
     should_quit: bool,
     should_center_on_next_render: bool, // Flag to center view after jump
     pending_g_press: bool,              // Track first 'g' press for 'gg' sequence
@@ -54,8 +57,10 @@ impl App {
             selected_index: 0,
             scroll_offset: 0,
             mode: AppMode::Normal,
-            jump_input: String::new(),
-            jump_error: None,
+            input_buffer: String::new(),
+            input_error: None,
+            search_matches: Vec::new(),
+            current_match_index: None,
             should_quit: false,
             should_center_on_next_render: false,
             pending_g_press: false,
@@ -83,44 +88,49 @@ impl App {
         }
     }
 
-    /// Open the jump dialog
-    fn open_jump_dialog(&mut self) {
-        self.mode = AppMode::JumpDialog;
-        self.jump_input.clear();
-        self.jump_error = None;
+    /// Open jump input mode
+    fn open_jump_input(&mut self) {
+        self.mode = AppMode::JumpInput;
+        self.input_buffer.clear();
+        self.input_error = None;
     }
 
-    /// Close the jump dialog without jumping
-    fn close_jump_dialog(&mut self) {
+    /// Open search input mode
+    fn open_search_input(&mut self) {
+        self.mode = AppMode::SearchInput;
+        self.input_buffer.clear();
+        self.input_error = None;
+    }
+
+    /// Close input mode and return to normal
+    fn close_input(&mut self) {
         self.mode = AppMode::Normal;
-        self.jump_input.clear();
-        self.jump_error = None;
+        self.input_buffer.clear();
+        self.input_error = None;
     }
 
-    /// Add a character to the jump input
+    /// Add a character to the input buffer
     fn input_char(&mut self, c: char) {
-        if c.is_ascii_digit() {
-            self.jump_input.push(c);
-            self.jump_error = None; // Clear error on new input
-        }
+        self.input_buffer.push(c);
+        self.input_error = None; // Clear error on new input
     }
 
-    /// Remove the last character from the jump input
+    /// Remove the last character from the input buffer
     fn input_backspace(&mut self) {
-        self.jump_input.pop();
-        self.jump_error = None;
+        self.input_buffer.pop();
+        self.input_error = None;
     }
 
-    /// Validate input and jump to subtitle if valid
+    /// Validate input and jump to subtitle number
     fn try_jump(&mut self) {
-        if self.jump_input.is_empty() {
-            self.jump_error = Some("please enter a subtitle number".to_string());
+        if self.input_buffer.is_empty() {
+            self.input_error = Some("please enter a subtitle number".to_string());
             return;
         }
 
-        match self.jump_input.parse::<usize>() {
+        match self.input_buffer.parse::<usize>() {
             Ok(user_index) if user_index == 0 => {
-                self.jump_error = Some("subtitle numbers start at 1".to_string());
+                self.input_error = Some("subtitle numbers start at 1".to_string());
             }
             Ok(user_index) => {
                 let zero_based_index = user_index - 1;
@@ -131,17 +141,104 @@ impl App {
                     );
                     self.selected_index = zero_based_index;
                     self.should_center_on_next_render = true;
-                    self.close_jump_dialog();
+                    self.close_input();
                 } else {
                     let max_subtitle = self.max_index() + 1;
-                    self.jump_error = Some(format!(
+                    self.input_error = Some(format!(
                         "subtitle {} not found (max: {})",
                         user_index, max_subtitle
                     ));
                 }
             }
             Err(_) => {
-                self.jump_error = Some("invalid number".to_string());
+                self.input_error = Some("invalid number".to_string());
+            }
+        }
+    }
+
+    /// Perform search and jump to first match
+    fn try_search(&mut self) {
+        if self.input_buffer.is_empty() {
+            self.input_error = Some("please enter search text".to_string());
+            return;
+        }
+
+        let search_text = self.input_buffer.to_lowercase();
+        self.search_matches.clear();
+
+        let max_len = self.subtitles1.len().max(self.subtitles2.len());
+        for i in 0..max_len {
+            let mut found = false;
+
+            if let Some(sub) = self.subtitles1.get(i) {
+                if sub.text.as_ref().to_lowercase().contains(&search_text) {
+                    found = true;
+                }
+            }
+
+            if !found {
+                if let Some(sub) = self.subtitles2.get(i) {
+                    if sub.text.as_ref().to_lowercase().contains(&search_text) {
+                        found = true;
+                    }
+                }
+            }
+
+            if found {
+                self.search_matches.push(i);
+            }
+        }
+
+        if self.search_matches.is_empty() {
+            self.input_error = Some(format!("no matches found for '{}'", self.input_buffer));
+            self.current_match_index = None;
+        } else {
+            debug!(
+                "found {} matches for '{}'",
+                self.search_matches.len(),
+                self.input_buffer
+            );
+            self.current_match_index = Some(0);
+            self.selected_index = self.search_matches[0];
+            self.should_center_on_next_render = true;
+            self.close_input();
+        }
+    }
+
+    /// Jump to next search match
+    fn next_match(&mut self) {
+        if let Some(current) = self.current_match_index {
+            if !self.search_matches.is_empty() {
+                let next = (current + 1) % self.search_matches.len();
+                self.current_match_index = Some(next);
+                self.selected_index = self.search_matches[next];
+                self.should_center_on_next_render = true;
+                debug!(
+                    "jumping to next match {} of {}",
+                    next + 1,
+                    self.search_matches.len()
+                );
+            }
+        }
+    }
+
+    /// Jump to previous search match
+    fn prev_match(&mut self) {
+        if let Some(current) = self.current_match_index {
+            if !self.search_matches.is_empty() {
+                let prev = if current == 0 {
+                    self.search_matches.len() - 1
+                } else {
+                    current - 1
+                };
+                self.current_match_index = Some(prev);
+                self.selected_index = self.search_matches[prev];
+                self.should_center_on_next_render = true;
+                debug!(
+                    "jumping to previous match {} of {}",
+                    prev + 1,
+                    self.search_matches.len()
+                );
             }
         }
     }
@@ -224,7 +321,8 @@ where
             if let Event::Key(key) = event::read()? {
                 match app.mode {
                     AppMode::Normal => handle_normal_mode_input(app, key.code),
-                    AppMode::JumpDialog => handle_dialog_mode_input(app, key.code),
+                    AppMode::JumpInput => handle_jump_input_mode(app, key.code),
+                    AppMode::SearchInput => handle_search_input_mode(app, key.code),
                 }
             }
         }
@@ -246,15 +344,9 @@ fn handle_normal_mode_input(app: &mut App, key_code: KeyCode) {
                 app.jump_to_first();
                 return;
             }
-            KeyCode::Char(c) if c.is_ascii_digit() => {
-                debug!("opening jump dialog and processing digit {}", c);
-                app.open_jump_dialog();
-                app.input_char(c);
-                return;
-            }
             _ => {
-                debug!("opening jump dialog (from pending g)");
-                app.open_jump_dialog();
+                // Any other key cancels the pending 'g'
+                // Fall through to handle current key
             }
         }
     }
@@ -287,19 +379,37 @@ fn handle_normal_mode_input(app: &mut App, key_code: KeyCode) {
             // r - jump to random
             app.jump_to_random();
         }
+        KeyCode::Char(':') => {
+            // Open jump input mode
+            debug!("opening jump input mode");
+            app.open_jump_input();
+        }
+        KeyCode::Char('/') => {
+            // Open search input mode
+            debug!("opening search input mode");
+            app.open_search_input();
+        }
+        KeyCode::Char('n') => {
+            // Next search match
+            app.next_match();
+        }
+        KeyCode::Char('N') => {
+            // Previous search match
+            app.prev_match();
+        }
         _ => {}
     }
 }
 
-/// Handle keyboard input in jump dialog mode
-fn handle_dialog_mode_input(app: &mut App, key_code: KeyCode) {
+/// Handle keyboard input in jump input mode
+fn handle_jump_input_mode(app: &mut App, key_code: KeyCode) {
     match key_code {
         KeyCode::Esc => {
-            debug!("closing jump dialog (cancelled)");
-            app.close_jump_dialog();
+            debug!("closing jump input (cancelled)");
+            app.close_input();
         }
         KeyCode::Enter => {
-            debug!("attempting to jump to subtitle: {}", app.jump_input);
+            debug!("attempting to jump to subtitle: {}", app.input_buffer);
             app.try_jump();
         }
         KeyCode::Char(c) if c.is_ascii_digit() => {
@@ -312,64 +422,25 @@ fn handle_dialog_mode_input(app: &mut App, key_code: KeyCode) {
     }
 }
 
-/// Calculate a centered rectangle for the popup dialog
-fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
-    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
-    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
-    let [area] = vertical.areas(area);
-    let [area] = horizontal.areas(area);
-    area
-}
-
-/// Render the jump dialog overlay
-fn render_jump_dialog(f: &mut Frame, app: &App) {
-    let area = popup_area(f.area(), 40, 25);
-
-    f.render_widget(Clear, area);
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([
-            Constraint::Length(1), // Title
-            Constraint::Length(1), // Spacing
-            Constraint::Length(1), // Input label
-            Constraint::Length(3), // Input box
-            Constraint::Length(1), // Error message
-            Constraint::Length(1), // Spacing
-            Constraint::Length(1), // Help text
-        ])
-        .split(area);
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::White))
-        .title(" Jump to Subtitle ");
-    f.render_widget(block, area);
-
-    let title = Paragraph::new("Enter subtitle number:");
-    f.render_widget(title, chunks[2]);
-
-    let input_text = if app.jump_input.is_empty() {
-        "_".to_string()
-    } else {
-        app.jump_input.clone()
-    };
-
-    let input = Paragraph::new(input_text)
-        .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().fg(Color::Yellow));
-    f.render_widget(input, chunks[3]);
-
-    if let Some(error) = &app.jump_error {
-        let error_msg = Paragraph::new(error.as_str()).style(Style::default().fg(Color::Red));
-        f.render_widget(error_msg, chunks[4]);
+/// Handle keyboard input in search input mode
+fn handle_search_input_mode(app: &mut App, key_code: KeyCode) {
+    match key_code {
+        KeyCode::Esc => {
+            debug!("closing search input (cancelled)");
+            app.close_input();
+        }
+        KeyCode::Enter => {
+            debug!("attempting to search for: {}", app.input_buffer);
+            app.try_search();
+        }
+        KeyCode::Char(c) => {
+            app.input_char(c);
+        }
+        KeyCode::Backspace => {
+            app.input_backspace();
+        }
+        _ => {}
     }
-
-    let help = Paragraph::new("Enter: jump | Esc: cancel")
-        .style(Style::default().fg(Color::DarkGray))
-        .alignment(Alignment::Center);
-    f.render_widget(help, chunks[6]);
 }
 
 /// Render the UI layout
@@ -416,18 +487,61 @@ fn ui(f: &mut Frame, app: &mut App) {
         viewport_height,
     );
 
-    let help_text_str = match app.mode {
+    // Render status/input line at bottom
+    let status_text = match app.mode {
         AppMode::Normal if app.pending_g_press => {
-            " Waiting for second key... (g: first | other: cancel)"
+            " Waiting for second key... (g: first | other: cancel)".to_string()
         }
-        AppMode::Normal => " j/k: move | g: jump | gg: first | G: last | r: random | q: quit",
-        AppMode::JumpDialog => "", // Help shown in dialog
+        AppMode::Normal => {
+            if let Some(match_idx) = app.current_match_index {
+                if !app.search_matches.is_empty() {
+                    format!(
+                        " j/k: move | /: search | n/N: next/prev match ({}/{}) | :: jump | gg: first | G: last | r: random | q: quit",
+                        match_idx + 1,
+                        app.search_matches.len()
+                    )
+                } else {
+                    " j/k: move | /: search | :: jump | gg: first | G: last | r: random | q: quit"
+                        .to_string()
+                }
+            } else {
+                " j/k: move | /: search | :: jump | gg: first | G: last | r: random | q: quit"
+                    .to_string()
+            }
+        }
+        AppMode::JumpInput => {
+            let input_display = if app.input_buffer.is_empty() {
+                "_".to_string()
+            } else {
+                app.input_buffer.clone()
+            };
+            format!(":{}", input_display)
+        }
+        AppMode::SearchInput => {
+            let input_display = if app.input_buffer.is_empty() {
+                "_".to_string()
+            } else {
+                app.input_buffer.clone()
+            };
+            format!("/{}", input_display)
+        }
     };
-    let help_text = Paragraph::new(help_text_str).style(Style::default().fg(Color::DarkGray));
-    f.render_widget(help_text, main_chunks[1]);
 
-    if matches!(app.mode, AppMode::JumpDialog) {
-        render_jump_dialog(f, app);
+    let status_style = if matches!(app.mode, AppMode::JumpInput | AppMode::SearchInput) {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let status_line = Paragraph::new(status_text).style(status_style);
+    f.render_widget(status_line, main_chunks[1]);
+
+    // Show error message if present
+    if let Some(error) = &app.input_error {
+        let error_line =
+            Paragraph::new(format!(" Error: {}", error)).style(Style::default().fg(Color::Red));
+        // Overlay error on top of status line
+        f.render_widget(error_line, main_chunks[1]);
     }
 }
 
