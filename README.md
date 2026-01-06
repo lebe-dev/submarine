@@ -107,9 +107,11 @@ Missing subtitles:
   [848] 00:41:39,497 --> 00:41:42,325 (not found in FILE2.srt)
   [...] ...
 
-# Adjust timestamps
-# Delay in seconds
-# sm add-delay [FILE.srt] [DELAY]
+# Get translation progress
+# sm ts --reference [REFERENCE-FILE] [FILE2]
+$ sm ts --reference Resident.Alien.S03E08.1080p.eng.srt Resident.Alien.S03E08.1080p.rus.srt
+Progress: 873/876 (99.7%)
+Next chunk: 474-523
 ```
 
 ## Usage in chat with LLM

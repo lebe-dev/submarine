@@ -172,4 +172,20 @@ pub enum Commands {
         #[arg(value_name = "FILE2")]
         file2: String,
     },
+
+    /// Check translation progress against reference file
+    #[command(visible_alias = "ts")]
+    TranslationStatus {
+        /// Path to the reference SRT file
+        #[arg(long, short = 'r', value_name = "FILE")]
+        reference: String,
+
+        /// Path to the translation SRT file
+        #[arg(value_name = "TRANSLATION_FILE")]
+        translation: String,
+
+        /// Chunk size for next translation suggestion
+        #[arg(long, default_value = "50")]
+        chunk_size: usize,
+    },
 }

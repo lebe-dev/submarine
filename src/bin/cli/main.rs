@@ -107,6 +107,18 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::TranslationStatus {
+                reference,
+                translation,
+                chunk_size,
+            } => {
+                if let Err(e) =
+                    cmd::translation_status::handle(&reference, &translation, chunk_size)
+                {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");
