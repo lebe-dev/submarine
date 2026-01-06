@@ -193,6 +193,10 @@ pub enum Commands {
         /// Path to the target SRT file to verify (FILE2)
         #[arg(value_name = "FILE2")]
         file2: String,
+
+        /// Optional subtitle range in format START-END (e.g., "1-50")
+        #[arg(long, value_name = "RANGE")]
+        range: Option<String>,
     },
 
     /// Check translation progress against reference file

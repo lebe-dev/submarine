@@ -109,8 +109,12 @@ fn main() {
                     std::process::exit(1);
                 }
             }
-            Commands::Verify { file1, file2 } => {
-                if let Err(e) = cmd::verify::handle(&file1, &file2) {
+            Commands::Verify {
+                file1,
+                file2,
+                range,
+            } => {
+                if let Err(e) = cmd::verify::handle(&file1, &file2, range.as_deref()) {
                     eprintln!("error: {}", e);
                     std::process::exit(1);
                 }

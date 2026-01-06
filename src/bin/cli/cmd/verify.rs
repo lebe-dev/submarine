@@ -6,15 +6,50 @@ use lib::verify::service;
 use log::{debug, error, info};
 use std::path::Path;
 
+/// Parse range string in format "START-END" into (start, end) tuple
+fn parse_range(range: &str) -> anyhow::Result<(u32, u32)> {
+    let parts: Vec<&str> = range.split('-').collect();
+
+    if parts.len() != 2 {
+        error!("invalid range format: {}", range);
+        eprintln!(
+            "error: invalid range format '{}'. Expected format: START-END (e.g., 1-50)",
+            range
+        );
+        std::process::exit(1);
+    }
+
+    let start = parts[0].trim().parse::<u32>().map_err(|_| {
+        error!("invalid start index in range: {}", parts[0]);
+        eprintln!(
+            "error: invalid start index '{}'. Must be a positive number",
+            parts[0]
+        );
+        std::process::exit(1);
+    })?;
+
+    let end = parts[1].trim().parse::<u32>().map_err(|_| {
+        error!("invalid end index in range: {}", parts[1]);
+        eprintln!(
+            "error: invalid end index '{}'. Must be a positive number",
+            parts[1]
+        );
+        std::process::exit(1);
+    })?;
+
+    Ok((start, end))
+}
+
 /// Entry point for the verify command
 ///
 /// Loads two SRT files and compares them for index and timestamp discrepancies.
 /// The first file is treated as the reference (authoritative).
-pub fn handle(file1: &str, file2: &str) -> anyhow::Result<()> {
+/// Optionally accepts a range parameter to verify only subtitles within that range.
+pub fn handle(file1: &str, file2: &str, range: Option<&str>) -> anyhow::Result<()> {
     info!("verifying files: {} and {}", file1, file2);
 
-    let (ref_subs, ref_filename) = load_subtitle_file(file1)?;
-    let (target_subs, target_filename) = load_subtitle_file(file2)?;
+    let (mut ref_subs, ref_filename) = load_subtitle_file(file1)?;
+    let (mut target_subs, target_filename) = load_subtitle_file(file2)?;
 
     debug!(
         "loaded {} and {} subtitles",
@@ -22,7 +57,59 @@ pub fn handle(file1: &str, file2: &str) -> anyhow::Result<()> {
         target_subs.len()
     );
 
-    // Check for empty files
+    let range_info = if let Some(range_str) = range {
+        let (start, end) = parse_range(range_str)?;
+
+        if start < 1 {
+            error!("invalid start index: must be >= 1");
+            eprintln!("error: start index must be >= 1, got {}", start);
+            std::process::exit(1);
+        }
+
+        if end < 1 {
+            error!("invalid end index: must be >= 1");
+            eprintln!("error: end index must be >= 1, got {}", end);
+            std::process::exit(1);
+        }
+
+        if start > end {
+            error!("invalid range: start {} > end {}", start, end);
+            eprintln!(
+                "error: start index must be <= end index (got {} > {})",
+                start, end
+            );
+            std::process::exit(1);
+        }
+
+        info!("filtering subtitles to range {}-{}", start, end);
+
+        ref_subs = ref_subs
+            .into_iter()
+            .filter(|s| {
+                let index = *s.index.as_ref();
+                index >= start && index <= end
+            })
+            .collect();
+
+        target_subs = target_subs
+            .into_iter()
+            .filter(|s| {
+                let index = *s.index.as_ref();
+                index >= start && index <= end
+            })
+            .collect();
+
+        debug!(
+            "after filtering: {} ref subtitles, {} target subtitles",
+            ref_subs.len(),
+            target_subs.len()
+        );
+
+        Some((start, end))
+    } else {
+        None
+    };
+
     if ref_subs.is_empty() {
         eprintln!("error: reference file is empty");
         std::process::exit(1);
@@ -35,14 +122,13 @@ pub fn handle(file1: &str, file2: &str) -> anyhow::Result<()> {
 
     let report = service::compare_subtitles(ref_subs, ref_filename, target_subs, target_filename);
 
-    display_verification_report(&report);
+    display_verification_report(&report, range_info);
 
     info!(
         "verification completed: {:.1}% match",
         report.match_percentage()
     );
 
-    // Exit with error code if there are issues
     if report.has_issues() || !report.is_perfect() {
         std::process::exit(1);
     }
@@ -144,9 +230,13 @@ fn load_subtitle_file(file: &str) -> anyhow::Result<(Vec<Subtitle>, String)> {
 }
 
 /// Display the verification report to the user
-fn display_verification_report(report: &VerificationReport) {
+fn display_verification_report(report: &VerificationReport, range_info: Option<(u32, u32)>) {
     println!();
-    println!("Verifying subtitle files");
+    if let Some((start, end)) = range_info {
+        println!("Verifying subtitle files (range: {}-{})", start, end);
+    } else {
+        println!("Verifying subtitle files");
+    }
     println!("========================");
     println!();
     println!(

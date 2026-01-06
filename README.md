@@ -68,8 +68,9 @@ $ sm add ResidentAlienS01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 
 # Import subtitles from csv file
 # Creates srt file if not exists
-# sm import [--dry-run] [--force] [FILE.srt] [IMPORT.csv]
-$ sm import ResidentAlienS01E01.srt import.csv
+# sm import [--dry-run] [--format=csv,anchored] [--force] [FILE.srt] [IMPORT.csv]
+$ sm import --format=csv ResidentAlienS01E01.srt import.csv
+$ sm import --format=anchored ResidentAlienS01E01.srt import.txt
 
 # Check file integrity
 # sm doctor [--fix] [FILE.srt]
@@ -94,8 +95,9 @@ $ sm mass-rename --dry-run \
 $ sm compare FILE1.srt FILE2.srt
 
 # Verify subtitle files
-# sm verity [REFERENCE-FILE] [FILE2]
+# sm verity [--range=1-50] [REFERENCE-FILE] [FILE2]
 $ sm verify ResidentAlienS01E01.eng.srt ResidentAlienS01E01.rus.srt
+$ sm verify --range=1-50ResidentAlienS01E01.eng.srt ResidentAlienS01E01.rus.srt 
 
 Results
 ==================
