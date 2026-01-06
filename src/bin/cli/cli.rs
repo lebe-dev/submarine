@@ -6,6 +6,14 @@ pub enum ExportFormat {
     Anchored,
 }
 
+#[derive(Clone, Debug, ValueEnum)]
+pub enum ImportFormat {
+    /// CSV format: start_time|end_time|text
+    Csv,
+    /// Anchored format: [INDEX] TEXT
+    Anchored,
+}
+
 #[derive(Parser)]
 #[command(name = "sm")]
 #[command(version)]
@@ -92,17 +100,25 @@ pub enum Commands {
         file: String,
     },
 
-    /// Import subtitles from a CSV file into an SRT file
+    /// Import subtitles from a file into an SRT file
     Import {
         /// Path to the SRT file
         #[arg(value_name = "SRT_FILE")]
         srt_file: String,
 
-        /// Path to the CSV file
-        #[arg(value_name = "CSV_FILE")]
-        csv_file: String,
+        /// Path to the input file
+        #[arg(value_name = "INPUT_FILE")]
+        input_file: String,
 
-        /// CSV delimiter character (default: pipe '|')
+        /// Import format
+        #[arg(long, value_name = "FORMAT")]
+        format: ImportFormat,
+
+        /// Path to reference SRT file (required for anchored format)
+        #[arg(long, value_name = "FILE")]
+        reference: Option<String>,
+
+        /// Delimiter character for CSV format (default: pipe '|')
         #[arg(long, default_value = "|")]
         delimiter: String,
 

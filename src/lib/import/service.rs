@@ -1,8 +1,9 @@
-use crate::import::model::CsvSubtitleRow;
+use crate::import::model::{AnchoredSubtitleRow, CsvSubtitleRow};
 use crate::import::ports::ImportService;
 use crate::subtitle::model::SubtitleError;
 use csv::ReaderBuilder;
 use log::debug;
+use std::fs;
 use std::path::Path;
 
 pub struct CsvImportService;
@@ -93,6 +94,129 @@ impl ImportService for CsvImportService {
         }
 
         debug!("parsed {} rows from csv file", rows.len());
+        Ok(rows)
+    }
+
+    fn parse_anchored_file(
+        &self,
+        _anchored_path: &Path,
+    ) -> Result<Vec<AnchoredSubtitleRow>, SubtitleError> {
+        Err(SubtitleError::InvalidPath(
+            "CsvImportService does not support anchored format parsing".to_string(),
+        ))
+    }
+}
+
+pub struct AnchoredImportService;
+
+impl AnchoredImportService {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Parse anchored format line to extract index and first line text
+    fn parse_anchored_line(line: &str) -> Option<(u32, String)> {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('[') {
+            return None;
+        }
+
+        let close_bracket = trimmed.find(']')?;
+        let index_str = &trimmed[1..close_bracket];
+        let index = index_str.parse::<u32>().ok()?;
+
+        let text = if close_bracket + 1 < trimmed.len() {
+            trimmed[close_bracket + 1..].trim_start().to_string()
+        } else {
+            String::new()
+        };
+
+        Some((index, text))
+    }
+}
+
+impl ImportService for AnchoredImportService {
+    fn parse_csv_file(
+        &self,
+        _csv_path: &Path,
+        _delimiter: char,
+    ) -> Result<Vec<CsvSubtitleRow>, SubtitleError> {
+        Err(SubtitleError::InvalidPath(
+            "AnchoredImportService does not support CSV parsing".to_string(),
+        ))
+    }
+
+    fn parse_anchored_file(
+        &self,
+        anchored_path: &Path,
+    ) -> Result<Vec<AnchoredSubtitleRow>, SubtitleError> {
+        debug!("parsing anchored format file: {:?}", anchored_path);
+
+        let content = fs::read_to_string(anchored_path)?;
+
+        let mut rows = Vec::new();
+        let mut current_index: Option<u32> = None;
+        let mut current_text = String::new();
+        let mut current_line_number = 0;
+
+        for (line_num, line) in content.lines().enumerate() {
+            let line_number = line_num + 1;
+
+            if let Some((index, first_line_text)) = Self::parse_anchored_line(line) {
+                if let Some(idx) = current_index {
+                    if current_text.trim().is_empty() {
+                        return Err(SubtitleError::AnchoredParseError {
+                            line: current_line_number,
+                            message: format!("Subtitle [{}] has empty text", idx),
+                        });
+                    }
+                    rows.push(AnchoredSubtitleRow {
+                        line_number: current_line_number,
+                        index: idx,
+                        text: current_text.trim().to_string(),
+                    });
+                }
+
+                current_index = Some(index);
+                current_text = first_line_text;
+                current_line_number = line_number;
+            } else {
+                if current_index.is_some() {
+                    if !current_text.is_empty() {
+                        current_text.push('\n');
+                    }
+                    current_text.push_str(line);
+                } else if !line.trim().is_empty() {
+                    return Err(SubtitleError::AnchoredParseError {
+                        line: line_number,
+                        message: "Text line found before any [INDEX] marker".to_string(),
+                    });
+                }
+            }
+        }
+
+        if let Some(idx) = current_index {
+            if current_text.trim().is_empty() {
+                return Err(SubtitleError::AnchoredParseError {
+                    line: current_line_number,
+                    message: format!("Subtitle [{}] has empty text", idx),
+                });
+            }
+            rows.push(AnchoredSubtitleRow {
+                line_number: current_line_number,
+                index: idx,
+                text: current_text.trim().to_string(),
+            });
+        }
+
+        if rows.is_empty() {
+            return Err(SubtitleError::AnchoredParseError {
+                line: 0,
+                message: "No valid subtitle entries found in anchored file".to_string(),
+            });
+        }
+
+        debug!("parsed {} entries from anchored file", rows.len());
         Ok(rows)
     }
 }
@@ -196,5 +320,138 @@ mod tests {
         let service = CsvImportService::new();
         let rows = service.parse_csv_file(temp_file.path(), '|').unwrap();
         assert_eq!(rows[0].text, "<i>Italic</i>");
+    }
+
+    // ========== Anchored Format Tests ==========
+
+    #[test]
+    fn test_parse_anchored_single_line() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "[1] First subtitle").unwrap();
+        writeln!(temp_file, "[2] Second subtitle").unwrap();
+        temp_file.flush().unwrap();
+
+        let service = AnchoredImportService::new();
+        let rows = service.parse_anchored_file(temp_file.path()).unwrap();
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].index, 1);
+        assert_eq!(rows[0].text, "First subtitle");
+        assert_eq!(rows[0].line_number, 1);
+        assert_eq!(rows[1].index, 2);
+        assert_eq!(rows[1].text, "Second subtitle");
+        assert_eq!(rows[1].line_number, 2);
+    }
+
+    #[test]
+    fn test_parse_anchored_multiline() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "[1] Line 1 of sub 1").unwrap();
+        writeln!(temp_file, "Line 2 of sub 1").unwrap();
+        writeln!(temp_file, "Line 3 of sub 1").unwrap();
+        writeln!(temp_file, "[2] Single line").unwrap();
+        temp_file.flush().unwrap();
+
+        let service = AnchoredImportService::new();
+        let rows = service.parse_anchored_file(temp_file.path()).unwrap();
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            rows[0].text,
+            "Line 1 of sub 1\nLine 2 of sub 1\nLine 3 of sub 1"
+        );
+        assert_eq!(rows[1].text, "Single line");
+    }
+
+    #[test]
+    fn test_parse_anchored_with_html() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "[1] <i>Italic text</i>").unwrap();
+        writeln!(temp_file, "[2] <b>Bold text</b>").unwrap();
+        temp_file.flush().unwrap();
+
+        let service = AnchoredImportService::new();
+        let rows = service.parse_anchored_file(temp_file.path()).unwrap();
+
+        assert_eq!(rows[0].text, "<i>Italic text</i>");
+        assert_eq!(rows[1].text, "<b>Bold text</b>");
+    }
+
+    #[test]
+    fn test_parse_anchored_invalid_no_bracket() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "Text without bracket").unwrap();
+        temp_file.flush().unwrap();
+
+        let service = AnchoredImportService::new();
+        let result = service.parse_anchored_file(temp_file.path());
+
+        assert!(matches!(
+            result,
+            Err(SubtitleError::AnchoredParseError { line: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn test_parse_anchored_empty_text() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "[1]").unwrap();
+        writeln!(temp_file, "[2] Next").unwrap();
+        temp_file.flush().unwrap();
+
+        let service = AnchoredImportService::new();
+        let result = service.parse_anchored_file(temp_file.path());
+
+        assert!(matches!(
+            result,
+            Err(SubtitleError::AnchoredParseError { line: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn test_parse_anchored_empty_file() {
+        let temp_file = NamedTempFile::new().unwrap();
+
+        let service = AnchoredImportService::new();
+        let result = service.parse_anchored_file(temp_file.path());
+
+        assert!(matches!(
+            result,
+            Err(SubtitleError::AnchoredParseError { line: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn test_parse_anchored_mixed_indices() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "[5] Fifth subtitle").unwrap();
+        writeln!(temp_file, "[10] Tenth subtitle").unwrap();
+        writeln!(temp_file, "[1] First subtitle").unwrap();
+        temp_file.flush().unwrap();
+
+        let service = AnchoredImportService::new();
+        let rows = service.parse_anchored_file(temp_file.path()).unwrap();
+
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].index, 5);
+        assert_eq!(rows[1].index, 10);
+        assert_eq!(rows[2].index, 1);
+    }
+
+    #[test]
+    fn test_parse_anchored_with_blank_lines() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "[1] First").unwrap();
+        writeln!(temp_file).unwrap(); // blank line
+        writeln!(temp_file, "[2] Second").unwrap();
+        temp_file.flush().unwrap();
+
+        let service = AnchoredImportService::new();
+        let rows = service.parse_anchored_file(temp_file.path()).unwrap();
+
+        assert_eq!(rows.len(), 2);
+        // Blank line becomes part of the first subtitle's text
+        assert_eq!(rows[0].text, "First");
+        assert_eq!(rows[1].text, "Second");
     }
 }

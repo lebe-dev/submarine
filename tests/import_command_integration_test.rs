@@ -13,11 +13,13 @@ fn run_import_command(srt_file: &str, csv_file: &str, delimiter: &str) -> std::p
             "sm",
             "--",
             "import",
-            srt_file,
-            csv_file,
+            "--format",
+            "csv",
             "--delimiter",
             delimiter,
             "--force",
+            srt_file,
+            csv_file,
         ])
         .output()
         .expect("Failed to execute command")
@@ -70,6 +72,10 @@ fn test_import_creates_new_srt_file() {
 
     let output = run_import_command(srt_file.to_str().unwrap(), csv_file.to_str().unwrap(), "|");
 
+    if !output.status.success() {
+        eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+        eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+    }
     assert!(output.status.success(), "Command should succeed");
 
     // Verify file contains imported subtitles
@@ -530,7 +536,7 @@ fn test_import_csv_file_not_found() {
     assert!(!output.status.success());
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("failed to resolve csv file path"));
+    assert!(stderr.contains("failed to resolve input file path"));
 }
 
 #[test]
@@ -656,11 +662,13 @@ fn test_import_dry_run_mode() {
             "sm",
             "--",
             "import",
-            srt_file.to_str().unwrap(),
-            csv_file.to_str().unwrap(),
+            "--format",
+            "csv",
             "--delimiter",
             "|",
             "--dry-run",
+            srt_file.to_str().unwrap(),
+            csv_file.to_str().unwrap(),
         ])
         .output()
         .expect("Failed to execute command");
@@ -698,11 +706,13 @@ fn test_import_with_force_flag() {
             "sm",
             "--",
             "import",
-            srt_file.to_str().unwrap(),
-            csv_file.to_str().unwrap(),
+            "--format",
+            "csv",
             "--delimiter",
             "|",
             "--force",
+            srt_file.to_str().unwrap(),
+            csv_file.to_str().unwrap(),
         ])
         .output()
         .expect("Failed to execute command");
@@ -738,11 +748,13 @@ fn test_import_dry_run_shows_preview_details() {
             "sm",
             "--",
             "import",
-            srt_file.to_str().unwrap(),
-            csv_file.to_str().unwrap(),
+            "--format",
+            "csv",
             "--delimiter",
             "|",
             "--dry-run",
+            srt_file.to_str().unwrap(),
+            csv_file.to_str().unwrap(),
         ])
         .output()
         .expect("Failed to execute command");
@@ -784,11 +796,13 @@ fn test_import_dry_run_with_many_subtitles_shows_limited_preview() {
             "sm",
             "--",
             "import",
-            srt_file.to_str().unwrap(),
-            csv_file.to_str().unwrap(),
+            "--format",
+            "csv",
             "--delimiter",
             "|",
             "--dry-run",
+            srt_file.to_str().unwrap(),
+            csv_file.to_str().unwrap(),
         ])
         .output()
         .expect("Failed to execute command");

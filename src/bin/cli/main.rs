@@ -57,14 +57,22 @@ fn main() {
             }
             Commands::Import {
                 srt_file,
-                csv_file,
+                input_file,
+                format,
+                reference,
                 delimiter,
                 dry_run,
                 force,
             } => {
-                if let Err(e) =
-                    cmd::import::handle(&srt_file, &csv_file, &delimiter, dry_run, force)
-                {
+                if let Err(e) = cmd::import::handle(
+                    &srt_file,
+                    &input_file,
+                    format,
+                    reference.as_deref(),
+                    &delimiter,
+                    dry_run,
+                    force,
+                ) {
                     eprintln!("error: {}", e);
                     std::process::exit(1);
                 }

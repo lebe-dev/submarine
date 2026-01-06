@@ -1,5 +1,5 @@
+use super::model::{AnchoredSubtitleRow, CsvSubtitleRow};
 use crate::subtitle::model::SubtitleError;
-use super::model::CsvSubtitleRow;
 use std::path::Path;
 
 /// Service interface for importing subtitles from various sources
@@ -22,4 +22,21 @@ pub trait ImportService {
         csv_path: &Path,
         delimiter: char,
     ) -> Result<Vec<CsvSubtitleRow>, SubtitleError>;
+
+    /// Parse anchored format file and return validated data
+    ///
+    /// # Arguments
+    /// * `anchored_path` - Path to the anchored format file
+    ///
+    /// # Returns
+    /// Vector of parsed anchored rows with line numbers for error reporting
+    ///
+    /// # Errors
+    /// * `SubtitleError::IoError` - Failed to read file
+    /// * `SubtitleError::AnchoredParseError` - Invalid anchored format
+    /// * `SubtitleError::InvalidAnchoredFormat` - Malformed index or structure
+    fn parse_anchored_file(
+        &self,
+        anchored_path: &Path,
+    ) -> Result<Vec<AnchoredSubtitleRow>, SubtitleError>;
 }

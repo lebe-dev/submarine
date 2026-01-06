@@ -167,4 +167,29 @@ pub trait SubtitleService {
         text: SubtitleText,
     ) -> Result<AddReport, SubtitleError>;
 
+    /// Writes all subtitles to a file, replacing existing content
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The name of the subtitle file (relative to service's base directory)
+    /// * `subtitles` - Vector of subtitles to write
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - Successfully written
+    /// * `Err(SubtitleError)` - If write fails
+    ///
+    /// # Behavior
+    ///
+    /// - Replaces entire file content with provided subtitles
+    /// - Writes in proper SRT format with blank lines between entries
+    /// - Does NOT create backup (caller responsible for backup if needed)
+    /// - Validates filename for path traversal
+    ///
+    /// # Errors
+    ///
+    /// * `SubtitleError::InvalidPath` - The filename contains path traversal attempts
+    /// * `SubtitleError::WriteFailed` - Failed to write file
+    /// * `SubtitleError::IoError` - I/O error during write
+    fn write_all(&self, filename: &str, subtitles: &[Subtitle]) -> Result<(), SubtitleError>;
 }

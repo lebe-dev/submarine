@@ -311,6 +311,26 @@ impl SubtitleService for SubRipService {
             total_subtitles: subtitles.len(),
         })
     }
+
+    fn write_all(&self, filename: &str, subtitles: &[Subtitle]) -> Result<(), SubtitleError> {
+        debug!("writing {} subtitles to {}", subtitles.len(), filename);
+
+        Self::validate_filename(filename)?;
+        let file_path = self.build_file_path(filename);
+
+        let mut content = String::new();
+        for subtitle in subtitles {
+            content.push_str(&subtitle.to_string());
+            content.push_str("\n\n");
+        }
+
+        debug!("writing file: {:?}", file_path);
+        fs::write(&file_path, content.trim_end())
+            .map_err(|e| SubtitleError::WriteFailed(format!("failed to write file: {}", e)))?;
+
+        info!("wrote {} subtitles to {}", subtitles.len(), filename);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
