@@ -17,13 +17,14 @@ Submarine is designed to assist the translation process by providing various edi
   - Get subtitle by index
   - Add a new subtitle
   - Set subtitle by offset
-  - Timestamps management: add delay
   - Mass-rename subtitle files
+  - Export subtitles in various formats (anchored)
 - **Validation:**
   - Check integrity
   - Compare with another subtitle files (quantity of subtitles, timestamps, etc). For example, you can compare english subtitles with translated by LLM.
 - **Verification:**
   - Verify translated subtitles against the original content
+  - Track translation progress
 - **Auto-backups:** automatically create backups of your subtitle files before making changes.
 
 ## Usage
@@ -95,9 +96,9 @@ $ sm mass-rename --dry-run \
 $ sm compare FILE1.srt FILE2.srt
 
 # Verify subtitle files
-# sm verity [--range=1-50] [REFERENCE-FILE] [FILE2]
+# sm verify [--range=1-50] [REFERENCE-FILE] [FILE2]
 $ sm verify ResidentAlienS01E01.eng.srt ResidentAlienS01E01.rus.srt
-$ sm verify --range=1-50ResidentAlienS01E01.eng.srt ResidentAlienS01E01.rus.srt 
+$ sm verify --range=1-50 ResidentAlienS01E01.eng.srt ResidentAlienS01E01.rus.srt 
 
 Results
 ==================
