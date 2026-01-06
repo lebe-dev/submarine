@@ -7,7 +7,7 @@ use lib::import::service::{AnchoredImportService, CsvImportService};
 use lib::subtitle::model::{Subtitle, SubtitleError, SubtitleText, SubtitleTimestamp};
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::Path;
@@ -28,12 +28,10 @@ fn show_preview(subtitles: &[Subtitle]) {
             Subtitle::format_timestamp(subtitle.start_time.as_ref()),
             Subtitle::format_timestamp(subtitle.end_time.as_ref())
         );
-        // Show first 50 characters of text
         let text = subtitle.text.as_str();
-        let preview_text = if text.len() > 50 {
-            format!("{}...", &text[..50])
-        } else {
-            text.to_string()
+        let preview_text = match text.char_indices().nth(50) {
+            Some((byte_idx, _)) => format!("{}...", &text[..byte_idx]),
+            None => text.to_string(),
         };
         println!("       {}", preview_text.replace('\n', " "));
         println!();
@@ -552,36 +550,14 @@ fn handle_anchored_import(
         }
     }
 
-    // Build complete subtitle list with updated entries
-    let anchored_indices: HashMap<u32, Subtitle> = updated_subtitles
-        .into_iter()
-        .map(|s| (*s.index.as_ref(), s))
-        .collect();
+    let mut final_subtitles = updated_subtitles;
 
-    let mut final_subtitles = Vec::new();
-    for ref_subtitle in reference_subtitles {
-        let index = *ref_subtitle.index.as_ref();
-        if let Some(updated) = anchored_indices.get(&index) {
-            final_subtitles.push(updated.clone());
-        } else {
-            final_subtitles.push(ref_subtitle);
-        }
-    }
+    final_subtitles.sort_by_key(|s| *s.index.as_ref());
 
-    let updated_count = anchored_indices.len();
-    let skipped_count = final_subtitles.len() - updated_count;
-
-    if skipped_count > 0 {
-        warn!(
-            "{} subtitle(s) from reference file not updated",
-            skipped_count
-        );
-        debug!(
-            "anchored file contained {}/{} indices from reference",
-            updated_count,
-            final_subtitles.len()
-        );
-    }
+    debug!(
+        "built final subtitle list with {} entries from anchored file",
+        final_subtitles.len()
+    );
 
     Ok(final_subtitles)
 }
