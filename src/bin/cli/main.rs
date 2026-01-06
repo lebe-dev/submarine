@@ -119,6 +119,16 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::Export {
+                file,
+                range,
+                format,
+            } => {
+                if let Err(e) = cmd::export::handle(&file, &range, format) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");

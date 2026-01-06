@@ -1,4 +1,10 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum ExportFormat {
+    /// Anchored format: [INDEX] TEXT
+    Anchored,
+}
 
 #[derive(Parser)]
 #[command(name = "sm")]
@@ -187,5 +193,20 @@ pub enum Commands {
         /// Chunk size for next translation suggestion
         #[arg(long, default_value = "50")]
         chunk_size: usize,
+    },
+
+    /// Export subtitles in specified format
+    Export {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+
+        /// Subtitle range in format START-END (e.g., "1-50")
+        #[arg(value_name = "RANGE")]
+        range: String,
+
+        /// Export format
+        #[arg(long, value_name = "FORMAT")]
+        format: ExportFormat,
     },
 }

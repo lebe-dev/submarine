@@ -112,6 +112,16 @@ Missing subtitles:
 $ sm ts --reference Resident.Alien.S03E08.1080p.eng.srt Resident.Alien.S03E08.1080p.rus.srt
 Progress: 873/876 (99.7%)
 Next chunk: 474-523
+
+# Export subtitles in specified format
+# sm export [FILE.srt] [RANGE] [--format=anchored]
+$ sm export movie.eng.srt 1-50 --format=anchored
+
+[1] Hello, how are you?
+[2] I'm fine, thanks.
+[3] Good to hear.
+...
+[50] See you tomorrow.
 ```
 
 ## Usage in chat with LLM
