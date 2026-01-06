@@ -57,10 +57,22 @@ fn main() {
             }
             Commands::Import {
                 srt_file,
-                csv_file,
+                input_file,
+                format,
+                reference,
                 delimiter,
+                dry_run,
+                force,
             } => {
-                if let Err(e) = cmd::import::handle(&srt_file, &csv_file, &delimiter) {
+                if let Err(e) = cmd::import::handle(
+                    &srt_file,
+                    &input_file,
+                    format,
+                    reference.as_deref(),
+                    &delimiter,
+                    dry_run,
+                    force,
+                ) {
                     eprintln!("error: {}", e);
                     std::process::exit(1);
                 }
@@ -93,6 +105,38 @@ fn main() {
             }
             Commands::Compare { file1, file2 } => {
                 if let Err(e) = cmd::compare::handle(&file1, &file2) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            Commands::Verify {
+                file1,
+                file2,
+                range,
+            } => {
+                if let Err(e) = cmd::verify::handle(&file1, &file2, range.as_deref()) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            Commands::TranslationStatus {
+                reference,
+                translation,
+                chunk_size,
+            } => {
+                if let Err(e) =
+                    cmd::translation_status::handle(&reference, &translation, chunk_size)
+                {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+            Commands::Export {
+                file,
+                range,
+                format,
+            } => {
+                if let Err(e) = cmd::export::handle(&file, &range, format) {
                     eprintln!("error: {}", e);
                     std::process::exit(1);
                 }

@@ -1,4 +1,18 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum ExportFormat {
+    /// Anchored format: [INDEX] TEXT
+    Anchored,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum ImportFormat {
+    /// CSV format: start_time|end_time|text
+    Csv,
+    /// Anchored format: [INDEX] TEXT
+    Anchored,
+}
 
 #[derive(Parser)]
 #[command(name = "sm")]
@@ -86,19 +100,35 @@ pub enum Commands {
         file: String,
     },
 
-    /// Import subtitles from a CSV file into an SRT file
+    /// Import subtitles from a file into an SRT file
     Import {
         /// Path to the SRT file
         #[arg(value_name = "SRT_FILE")]
         srt_file: String,
 
-        /// Path to the CSV file
-        #[arg(value_name = "CSV_FILE")]
-        csv_file: String,
+        /// Path to the input file
+        #[arg(value_name = "INPUT_FILE")]
+        input_file: String,
 
-        /// CSV delimiter character (default: pipe '|')
+        /// Import format
+        #[arg(long, value_name = "FORMAT")]
+        format: ImportFormat,
+
+        /// Path to reference SRT file (required for anchored format)
+        #[arg(long, value_name = "FILE")]
+        reference: Option<String>,
+
+        /// Delimiter character for CSV format (default: pipe '|')
         #[arg(long, default_value = "|")]
         delimiter: String,
+
+        /// Preview changes without modifying the file
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip confirmation prompt
+        #[arg(long)]
+        force: bool,
     },
 
     /// Mass rename subtitle files using templates
@@ -152,5 +182,51 @@ pub enum Commands {
         /// Path to the second SRT file
         #[arg(value_name = "FILE2")]
         file2: String,
+    },
+
+    /// Verify two subtitle files for index and timestamp discrepancies
+    Verify {
+        /// Path to the reference SRT file (FILE1)
+        #[arg(value_name = "FILE1")]
+        file1: String,
+
+        /// Path to the target SRT file to verify (FILE2)
+        #[arg(value_name = "FILE2")]
+        file2: String,
+
+        /// Optional subtitle range in format START-END (e.g., "1-50")
+        #[arg(long, value_name = "RANGE")]
+        range: Option<String>,
+    },
+
+    /// Check translation progress against reference file
+    #[command(visible_alias = "ts")]
+    TranslationStatus {
+        /// Path to the reference SRT file
+        #[arg(long, short = 'r', value_name = "FILE")]
+        reference: String,
+
+        /// Path to the translation SRT file
+        #[arg(value_name = "TRANSLATION_FILE")]
+        translation: String,
+
+        /// Chunk size for next translation suggestion
+        #[arg(long, default_value = "50")]
+        chunk_size: usize,
+    },
+
+    /// Export subtitles in specified format
+    Export {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+
+        /// Subtitle range in format START-END (e.g., "1-50")
+        #[arg(value_name = "RANGE")]
+        range: String,
+
+        /// Export format
+        #[arg(long, value_name = "FORMAT")]
+        format: ExportFormat,
     },
 }

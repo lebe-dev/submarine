@@ -13,10 +13,13 @@ fn run_import_command(srt_file: &str, csv_file: &str, delimiter: &str) -> std::p
             "sm",
             "--",
             "import",
-            srt_file,
-            csv_file,
+            "--format",
+            "csv",
             "--delimiter",
             delimiter,
+            "--force",
+            srt_file,
+            csv_file,
         ])
         .output()
         .expect("Failed to execute command")
@@ -69,6 +72,10 @@ fn test_import_creates_new_srt_file() {
 
     let output = run_import_command(srt_file.to_str().unwrap(), csv_file.to_str().unwrap(), "|");
 
+    if !output.status.success() {
+        eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+        eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+    }
     assert!(output.status.success(), "Command should succeed");
 
     // Verify file contains imported subtitles
@@ -491,7 +498,8 @@ fn test_import_path_traversal_srt_rejected() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("path traversal") || stderr.contains("failed to resolve"),
-        "Should reject path traversal attempt"
+        "Should reject path traversal attempt. stderr was: {}",
+        stderr
     );
 }
 
@@ -506,8 +514,9 @@ fn test_import_path_traversal_csv_rejected() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("failed to resolve"),
-        "Should reject path traversal attempt"
+        stderr.contains("path traversal") || stderr.contains("failed to resolve"),
+        "Should reject path traversal attempt. stderr was: {}",
+        stderr
     );
 }
 
@@ -527,7 +536,7 @@ fn test_import_csv_file_not_found() {
     assert!(!output.status.success());
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("failed to resolve csv file path"));
+    assert!(stderr.contains("failed to resolve input file path"));
 }
 
 #[test]
@@ -627,4 +636,200 @@ fn test_import_index_range_with_existing_gaps() {
     assert!(content.contains("Sixth"));
     assert!(content.contains("7\n"));
     assert!(content.contains("Seventh"));
+}
+
+// ========== Dry-run and Force Flag Tests ==========
+
+#[test]
+fn test_import_dry_run_mode() {
+    // Test that dry-run mode shows preview but doesn't modify files
+    let temp_dir = TempDir::new().unwrap();
+
+    let csv_content = "start_time|end_time|text
+00:00:01,000|00:00:03,000|First subtitle
+00:00:04,000|00:00:06,000|Second subtitle";
+
+    let csv_file = create_temp_csv(&temp_dir, "test.csv", csv_content);
+    let srt_file = create_empty_srt(&temp_dir, "test.srt");
+
+    // Get initial content
+    let initial_content = fs::read_to_string(&srt_file).unwrap();
+
+    let output = Command::new("cargo")
+        .args(&[
+            "run",
+            "--bin",
+            "sm",
+            "--",
+            "import",
+            "--format",
+            "csv",
+            "--delimiter",
+            "|",
+            "--dry-run",
+            srt_file.to_str().unwrap(),
+            csv_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success(), "Command should succeed");
+
+    // Verify stdout shows preview
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Preview of 2 subtitle(s) to be imported"));
+    assert!(stdout.contains("Dry-run mode: no subtitles were imported"));
+
+    // Verify file was NOT modified
+    let final_content = fs::read_to_string(&srt_file).unwrap();
+    assert_eq!(
+        initial_content, final_content,
+        "File should not be modified in dry-run mode"
+    );
+}
+
+#[test]
+fn test_import_with_force_flag() {
+    // Test that --force flag skips confirmation and imports successfully
+    let temp_dir = TempDir::new().unwrap();
+
+    let csv_content = "start_time|end_time|text
+00:00:01,000|00:00:03,000|Test subtitle";
+
+    let csv_file = create_temp_csv(&temp_dir, "test.csv", csv_content);
+    let srt_file = create_empty_srt(&temp_dir, "test.srt");
+
+    let output = Command::new("cargo")
+        .args(&[
+            "run",
+            "--bin",
+            "sm",
+            "--",
+            "import",
+            "--format",
+            "csv",
+            "--delimiter",
+            "|",
+            "--force",
+            srt_file.to_str().unwrap(),
+            csv_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success(), "Command should succeed");
+
+    // Verify import was successful
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✓ Subtitles imported successfully"));
+    assert!(stdout.contains("Imported: 1 subtitles"));
+
+    // Verify file was modified
+    let content = fs::read_to_string(&srt_file).unwrap();
+    assert!(content.contains("Test subtitle"));
+}
+
+#[test]
+fn test_import_dry_run_shows_preview_details() {
+    // Test that dry-run mode shows detailed preview with timestamps and text
+    let temp_dir = TempDir::new().unwrap();
+
+    let csv_content = "start_time|end_time|text
+00:00:01,436|00:00:03,481|<i>Previously on...</i>
+00:00:05,000|00:00:07,000|Hello, world!";
+
+    let csv_file = create_temp_csv(&temp_dir, "test.csv", csv_content);
+    let srt_file = create_empty_srt(&temp_dir, "test.srt");
+
+    let output = Command::new("cargo")
+        .args(&[
+            "run",
+            "--bin",
+            "sm",
+            "--",
+            "import",
+            "--format",
+            "csv",
+            "--delimiter",
+            "|",
+            "--dry-run",
+            srt_file.to_str().unwrap(),
+            csv_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success(), "Command should succeed");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Verify preview contains timestamps
+    assert!(stdout.contains("00:00:01,436 --> 00:00:03,481"));
+    assert!(stdout.contains("00:00:05,000 --> 00:00:07,000"));
+
+    // Verify preview contains text snippets
+    assert!(stdout.contains("Previously on"));
+    assert!(stdout.contains("Hello, world!"));
+}
+
+#[test]
+fn test_import_dry_run_with_many_subtitles_shows_limited_preview() {
+    // Test that dry-run mode shows only first 5 subtitles in preview
+    let temp_dir = TempDir::new().unwrap();
+
+    let csv_content = "start_time|end_time|text
+00:00:01,000|00:00:02,000|Subtitle 1
+00:00:03,000|00:00:04,000|Subtitle 2
+00:00:05,000|00:00:06,000|Subtitle 3
+00:00:07,000|00:00:08,000|Subtitle 4
+00:00:09,000|00:00:10,000|Subtitle 5
+00:00:11,000|00:00:12,000|Subtitle 6
+00:00:13,000|00:00:14,000|Subtitle 7";
+
+    let csv_file = create_temp_csv(&temp_dir, "test.csv", csv_content);
+    let srt_file = create_empty_srt(&temp_dir, "test.srt");
+
+    let output = Command::new("cargo")
+        .args(&[
+            "run",
+            "--bin",
+            "sm",
+            "--",
+            "import",
+            "--format",
+            "csv",
+            "--delimiter",
+            "|",
+            "--dry-run",
+            srt_file.to_str().unwrap(),
+            csv_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success(), "Command should succeed");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Verify preview header shows total count
+    assert!(stdout.contains("Preview of 7 subtitle(s) to be imported"));
+
+    // Verify shows "... and N more" message
+    assert!(stdout.contains("... and 2 more subtitle(s)"));
+
+    // Verify first 5 are shown
+    assert!(stdout.contains("Subtitle 1"));
+    assert!(stdout.contains("Subtitle 5"));
+
+    // Subtitle 6 and 7 should not appear in detail (only in count)
+    let subtitle_6_count = stdout.matches("Subtitle 6").count();
+    let subtitle_7_count = stdout.matches("Subtitle 7").count();
+    assert_eq!(
+        subtitle_6_count, 0,
+        "Subtitle 6 should not appear in preview details"
+    );
+    assert_eq!(
+        subtitle_7_count, 0,
+        "Subtitle 7 should not appear in preview details"
+    );
 }

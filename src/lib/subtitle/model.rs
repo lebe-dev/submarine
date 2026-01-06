@@ -50,6 +50,15 @@ pub enum SubtitleError {
         existing_end: String,
         new_start: String,
     },
+
+    #[error("Anchored format parsing error at line {line}: {message}")]
+    AnchoredParseError { line: usize, message: String },
+
+    #[error("Reference file does not contain subtitle with index {index}")]
+    ReferenceIndexNotFound { index: u32 },
+
+    #[error("Invalid anchored format at line {line}: {message}")]
+    InvalidAnchoredFormat { line: usize, message: String },
 }
 
 #[nutype(

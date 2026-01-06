@@ -90,7 +90,6 @@ pub fn handle(
         None
     };
 
-    // 4. Parse and validate text option if provided
     let subtitle_text = if let Some(text_str) = text {
         debug!("validating text (length: {})", text_str.len());
         Some(SubtitleText::try_new(text_str).map_err(|e| anyhow::anyhow!("invalid text: {}", e))?)
@@ -98,14 +97,12 @@ pub fn handle(
         None
     };
 
-    // 5. Build update struct
     let update = SubtitleUpdate {
         start_time: start_timestamp,
         end_time: end_timestamp,
         text: subtitle_text,
     };
 
-    // 6. Create backup before modifying the file
     let backup_service = SubRipBackupService::new();
     let backup_result = backup_service.create_backup(&canonical_path);
 
@@ -126,7 +123,6 @@ pub fn handle(
         }
     };
 
-    // 7. Create service and execute update
     let service = SubRipService::new(base_dir);
 
     debug!("updating subtitle {}...", index);
@@ -213,6 +209,10 @@ pub fn handle(
                     eprintln!("error: Timestamp overlap at line {}", line);
                     eprintln!("  Existing ends at: {}", existing_end);
                     eprintln!("  New starts at: {}", new_start);
+                }
+                _ => {
+                    error!("unexpected error: {}", e);
+                    eprintln!("error: {}", e);
                 }
             }
             std::process::exit(1);

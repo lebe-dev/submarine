@@ -1,8 +1,11 @@
 pub mod add;
 pub mod compare;
 pub mod doctor;
+pub mod export;
 pub mod get;
 pub mod import;
 pub mod info;
 pub mod mass_rename;
 pub mod set;
+pub mod translation_status;
+pub mod verify;
