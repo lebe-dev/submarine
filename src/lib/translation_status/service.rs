@@ -64,8 +64,21 @@ pub fn check_translation_status(
         None
     } else {
         let start_index = missing[0];
-        let last_missing = missing[missing.len() - 1];
-        let end_index = std::cmp::min(start_index + chunk_size as u32 - 1, last_missing);
+        let mut end_index = start_index;
+        let mut count = 1;
+
+        for i in 1..missing.len() {
+            if count >= chunk_size {
+                break;
+            }
+
+            if missing[i] == end_index + 1 {
+                end_index = missing[i];
+                count += 1;
+            } else {
+                break;
+            }
+        }
 
         debug!("next chunk suggestion: {}-{}", start_index, end_index);
 
@@ -224,7 +237,7 @@ mod tests {
         assert!(report.next_chunk.is_some());
         let chunk = report.next_chunk.unwrap();
         assert_eq!(chunk.start_index, 2);
-        assert_eq!(chunk.end_index, 5);
+        assert_eq!(chunk.end_index, 2); // Останавливается на пропуске перед индексом 5
     }
 
     #[test]
@@ -299,6 +312,6 @@ mod tests {
         assert!(report.next_chunk.is_some());
         let chunk = report.next_chunk.unwrap();
         assert_eq!(chunk.start_index, 20);
-        assert_eq!(chunk.end_index, 24);
+        assert_eq!(chunk.end_index, 20); // Нет следующего индекса 21, останавливается на 20
     }
 }

@@ -210,7 +210,6 @@ pub fn handle(
 
     let (imported_count, start_index, end_index, total_subtitles) = match format {
         ImportFormat::Csv => {
-            // CSV appends subtitles
             debug!("adding {} subtitles...", subtitles.len());
             let mut added_count = 0;
             let mut start_idx = None;
@@ -255,11 +254,45 @@ pub fn handle(
             )
         }
         ImportFormat::Anchored => {
-            debug!("writing {} subtitles to file...", subtitles.len());
+            debug!(
+                "merging {} subtitles with existing file...",
+                subtitles.len()
+            );
 
-            match service.write_all(&filename, &subtitles) {
+            let existing_subs = match service.get_all(&filename) {
+                Ok(subs) => {
+                    debug!("loaded {} existing subtitles", subs.len());
+                    subs
+                }
+                Err(SubtitleError::FileNotFound(_)) => {
+                    debug!("file does not exist, creating new file");
+                    Vec::new()
+                }
+                Err(e) => {
+                    error!("failed to load existing file: {:?}", e);
+                    handle_subtitle_error(e);
+                    std::process::exit(1);
+                }
+            };
+
+            let mut merged_map: HashMap<u32, Subtitle> = HashMap::new();
+
+            for sub in existing_subs {
+                merged_map.insert(*sub.index.as_ref(), sub);
+            }
+
+            for sub in &subtitles {
+                merged_map.insert(*sub.index.as_ref(), sub.clone());
+            }
+
+            let mut merged_subs: Vec<Subtitle> = merged_map.into_values().collect();
+            merged_subs.sort_by_key(|s| *s.index.as_ref());
+
+            debug!("writing {} total subtitles to file...", merged_subs.len());
+
+            match service.write_all(&filename, &merged_subs) {
                 Ok(_) => {
-                    debug!("wrote {} subtitles to file", subtitles.len());
+                    debug!("wrote {} subtitles to file", merged_subs.len());
                 }
                 Err(e) => {
                     error!("failed to write updated file: {:?}", e);
@@ -279,7 +312,7 @@ pub fn handle(
                 .max()
                 .unwrap_or(0);
 
-            (subtitles.len(), min_idx, max_idx, subtitles.len())
+            (subtitles.len(), min_idx, max_idx, merged_subs.len())
         }
     };
 
@@ -445,7 +478,6 @@ fn handle_anchored_import(
         }
     };
 
-    // Load reference file
     debug!("loading reference file: {}", reference_file);
     let ref_path = Path::new(reference_file);
 
@@ -486,13 +518,11 @@ fn handle_anchored_import(
         }
     };
 
-    // Build index map for quick lookup
     let mut ref_map: HashMap<u32, &Subtitle> = HashMap::new();
     for subtitle in &reference_subtitles {
         ref_map.insert(*subtitle.index.as_ref(), subtitle);
     }
 
-    // Match anchored entries with reference
     let mut updated_subtitles = Vec::new();
 
     for anchored_row in &anchored_rows {

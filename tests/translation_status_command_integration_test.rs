@@ -20,10 +20,8 @@ fn create_srt_file(dir: &TempDir, filename: &str, subtitles: Vec<Subtitle>) -> S
     let file_path = dir.path().join(filename);
     let service = SubRipService::new(dir.path().to_path_buf());
 
-    // Create empty file first
     fs::write(&file_path, "").unwrap();
 
-    // Add each subtitle
     for sub in subtitles {
         service
             .add(filename, sub.start_time, sub.end_time, sub.text)
@@ -178,7 +176,7 @@ fn test_translation_with_gaps() {
     assert!(report.next_chunk.is_some());
     let chunk = report.next_chunk.unwrap();
     assert_eq!(chunk.start_index, 2);
-    assert_eq!(chunk.end_index, 5);
+    assert_eq!(chunk.end_index, 2);
 }
 
 #[test]
