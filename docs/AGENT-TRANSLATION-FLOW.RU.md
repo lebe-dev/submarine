@@ -20,15 +20,15 @@
 
 ### Шаг 1: Проверка статуса
 
-touch ЦЕЛЕВОЙ.rus.srt
+touch Resident.Alien.rus.srt
 
-sm translation-status --reference=ИСТОЧНИК.eng.srt ЦЕЛЕВОЙ.rus.srt
+sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Эта команда покажет прогресс и предложит следующий диапазон для перевода.
 
 ### Шаг 2: Извлечение фрагмента для перевода
 
-sm export --format=anchored ИСТОЧНИК.eng.srt 1-100
+sm export --format=anchored Resident.Alien.S03E08.eng.srt 1-100
 
 Формат вывода:
 
@@ -48,15 +48,15 @@ sm export --format=anchored ИСТОЧНИК.eng.srt 1-100
 
 ### Шаг 4: Импорт переводов
 
-sm import --force --reference=ИСТОЧНИК.eng.srt --format=anchored ЦЕЛЕВОЙ.rus.srt chunk.txt
+sm import --force --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
 
 ### Шаг 5: Проверка фрагмента
 
-sm verify --range=1-50 ИСТОЧНИК.eng.srt ЦЕЛЕВОЙ.rus.srt
+sm verify --range=1-50 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Если обнаружены пропущенные индексы, извлеките только их:
 
-sm export --format=anchored ИСТОЧНИК.eng.srt 40-41
+sm export --format=anchored Resident.Alien.S03E08.eng.srt 40-41
 
 Переведите пропущенные строки, добавьте их в `chunk.txt` и снова выполните импорт.
 
@@ -64,7 +64,7 @@ sm export --format=anchored ИСТОЧНИК.eng.srt 40-41
 
 Удалите `chunk.txt`.
 
-sm translation-status --reference=ИСТОЧНИК.eng.srt ЦЕЛЕВОЙ.rus.srt
+sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Продолжайте, пока прогресс не достигнет 100%.
 
