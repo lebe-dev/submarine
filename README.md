@@ -12,8 +12,9 @@ Submarine is designed to assist the translation process by providing various edi
 
 ## Features
 
-- Subtitle formats: [SubRip](https://en.wikipedia.org/wiki/SubRip), .srt
-- Support flows: 
+- Subtitles format: [SubRip](https://en.wikipedia.org/wiki/SubRip), .srt
+- Supported flows: 
+  - Agent: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md)
   - Chatbot: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md)
 - **Toolset:**
   - Get subtitle by index
