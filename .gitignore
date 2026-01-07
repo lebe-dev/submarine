@@ -2,6 +2,7 @@
 *.md
 !README.md
 !DEV.md
+!translate-prompt-template.md
 .env
 /out
 /*.zip
