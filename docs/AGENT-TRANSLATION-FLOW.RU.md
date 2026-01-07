@@ -80,8 +80,8 @@ sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S
 Запустите агента и дайте ему следующий промпт:
 
 ```prompt
-Давайте переведём субтитры для 8-й серии 3-го сезона сериала Resident Alien.
-Возьмите английские субтитры из `Resident.Alien.S03E08.eng.srt` и используйте инструмент `sm`.
+Давай переведём субтитры для 8-й серии 3-го сезона сериала Resident Alien.
+Возьмите английские субтитры из `Resident.Alien.S03E08.eng.srt` и используй инструмент `sm`.
 
 Ожидаю получить `Resident.Alien.S03E08.rus.srt` в результате.
 ```
