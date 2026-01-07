@@ -20,15 +20,15 @@ You are translating subtitles from English to Russian using the `sm` CLI tool.
 
 ### Step 1: Check status
 
-touch TARGET.rus.srt
+touch Resident.Alien.S03E08.rus.srt
 
-sm translation-status --reference=SOURCE.eng.srt TARGET.rus.srt
+sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 This shows progress and suggests next chunk range.
 
 ### Step 2: Extract chunk for translation
 
-sm export --format=anchored SOURCE.eng.srt 1-100
+sm export --format=anchored Resident.Alien.S03E08.eng.srt 1-100
 
 Output format:
 
@@ -48,15 +48,15 @@ IMPORTANT: Keep ALL indices. Do not skip any line.
 
 ### Step 4: Import translations
 
-sm import --force --reference=SOURCE.eng.srt --format=anchored TARGET.rus.srt chunk.txt 
+sm import --force --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt 
 
 ### Step 5: Verify chunk
 
-sm verify --range=1-50 SOURCE.eng.srt TARGET.rus.srt
+sm verify --range=1-50 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 If missing indices reported, extract only those:
 
-sm export --format=anchored SOURCE.eng.srt 40-41
+sm export --format=anchored Resident.Alien.S03E08.eng.srt 40-41
 
 Translate missing, append to `chunk.txt`, import again.
 
@@ -64,7 +64,7 @@ Translate missing, append to `chunk.txt`, import again.
 
 Remove `chunk.txt`.
 
-sm translation-status --reference=SOURCE.eng.srt TARGET.rus.srt
+sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Continue until progress is 100%.
 
