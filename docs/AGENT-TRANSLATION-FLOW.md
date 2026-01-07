@@ -74,6 +74,7 @@ Continue until progress is 100%.
 - Always verify after import
 - Fix all missing before moving to next chunk
 - Preserve original meaning, adapt idioms naturally
+```
 
 ###[/AGENTS.md]#######################################################
 
