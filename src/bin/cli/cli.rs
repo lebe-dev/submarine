@@ -230,31 +230,14 @@ pub enum Commands {
         format: ExportFormat,
     },
 
-    /// Generate prompts for LLM translation assistance
-    Prompt {
-        #[command(subcommand)]
-        command: PromptCommands,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum PromptCommands {
-    /// Generate translation prompt for subtitle range
-    Translate {
+    /// Adjust subtitle timestamps by specified milliseconds offset
+    Delay {
         /// Path to the SRT file
         #[arg(value_name = "FILE")]
         file: String,
 
-        /// Subtitle range in format START-END (e.g., "1-50")
-        #[arg(value_name = "RANGE")]
-        range: String,
-
-        /// Target language for translation
-        #[arg(long, value_name = "LANGUAGE")]
-        language: String,
-
-        /// Custom template file path (default: uses built-in template)
-        #[arg(long, value_name = "FILE")]
-        template_file: Option<String>,
+        /// Time offset in milliseconds (e.g., "+100", "-500")
+        #[arg(value_name = "OFFSET", allow_hyphen_values = true)]
+        offset: String,
     },
 }

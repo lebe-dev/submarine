@@ -142,24 +142,12 @@ fn main() {
                     std::process::exit(1);
                 }
             }
-            Commands::Prompt { command } => match command {
-                cli::PromptCommands::Translate {
-                    file,
-                    range,
-                    language,
-                    template_file,
-                } => {
-                    if let Err(e) = cmd::prompt::translate::handle(
-                        &file,
-                        &range,
-                        &language,
-                        template_file.as_deref(),
-                    ) {
-                        eprintln!("error: {}", e);
-                        std::process::exit(1);
-                    }
+            Commands::Delay { file, offset } => {
+                if let Err(e) = cmd::delay::handle(&file, &offset) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
                 }
-            },
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");

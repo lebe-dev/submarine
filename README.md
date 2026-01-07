@@ -68,6 +68,12 @@ $ sm set Resident.Alien.S01E01.srt 123 \
 # sm add [FILE.srt] [START-END-TIMESTAMP] "[NEW-SUBTITLE]"
 $ sm add Resident.Alien.S01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 
+# Adjust subtitle timestamps by offset
+# Supports positive and negative offsets in milliseconds
+# sm delay [FILE.srt] [OFFSET]
+$ sm delay Resident.Alien.S01E01.srt "+1000"  # Add 1 second
+$ sm delay Resident.Alien.S01E01.srt "-500"   # Subtract 0.5 seconds
+
 # Import subtitles from csv file
 # Creates srt file if not exists
 # sm import [--dry-run] [--format=csv,anchored] [--force] [FILE.srt] [IMPORT.csv]
@@ -105,10 +111,10 @@ Results
 ==================
  
 Matched: 874/876 (99.8%)
-Missing in FILE2: 2
+Missing in Resident.Alien.S01E01.rus.srt: 2
 Index offset detected: -2
 Missing subtitles:
-  [848] 00:41:39,497 --> 00:41:42,325 (not found in FILE2.srt)
+  [848] 00:41:39,497 --> 00:41:42,325 (not found in Resident.Alien.S01E01.rus.srt)
   [...] ...
 
 # Get translation progress
@@ -130,6 +136,6 @@ $ sm export --format=anchored movie.eng.srt 1-50
 
 ## RoadMap
 
-- Feature: adjust timestamps
+- Code refactoring
 - Feature: sync
 - Feature: merge
