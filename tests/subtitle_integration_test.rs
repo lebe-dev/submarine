@@ -152,18 +152,19 @@ fn test_parse_well_formed_srt_file() {
 #[test]
 fn test_parse_russian_srt_with_blank_lines() {
     // Test parsing of Russian subtitle file with blank lines within text
-    let service = SubRipService::new(PathBuf::from("."));
-    let filename = "test.rus.srt";
+    let service = SubRipService::new(PathBuf::from("test-data"));
+    let filename = "russian-with-blank-lines-in-text.rus.srt";
 
     let result = service.get_all(filename);
     assert!(
         result.is_ok(),
-        "Failed to parse test.rus.srt: {:?}",
+        "Failed to parse {}: {:?}",
+        filename,
         result.err()
     );
 
     let subtitles = result.unwrap();
-    assert_eq!(subtitles.len(), 4, "Expected 4 subtitles in test.rus.srt");
+    assert_eq!(subtitles.len(), 4, "Expected 4 subtitles in {}", filename);
 
     // Verify block 3 contains both lines with blank line preserved
     let sub3 = &subtitles[2]; // 0-indexed
