@@ -229,4 +229,15 @@ pub enum Commands {
         #[arg(long, value_name = "FORMAT")]
         format: ExportFormat,
     },
+
+    /// Adjust subtitle timestamps by specified milliseconds offset
+    Delay {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+
+        /// Time offset in milliseconds (e.g., "+100", "-500")
+        #[arg(value_name = "OFFSET", allow_hyphen_values = true)]
+        offset: String,
+    },
 }

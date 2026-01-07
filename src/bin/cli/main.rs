@@ -142,6 +142,12 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            Commands::Delay { file, offset } => {
+                if let Err(e) = cmd::delay::handle(&file, &offset) {
+                    eprintln!("error: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
     } else {
         eprintln!("No command specified. Use --help for usage information.");
