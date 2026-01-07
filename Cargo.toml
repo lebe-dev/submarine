@@ -4,6 +4,7 @@ version = "0.12.0"
 description = "Toolkit for subtitle processing"
 edition = "2024"
 authors = ["Eugene Lebedev <eugene.0x90@gmail.com>"]
+license = "MIT"
 homepage = "https://github.com/lebe-dev/submarine"
 repository = "https://github.com/lebe-dev/submarine"
 readme = "README.md"
