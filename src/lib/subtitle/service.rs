@@ -50,17 +50,14 @@ impl SubRipService {
     fn is_block_boundary(lines: &[&str], current_pos: usize) -> bool {
         let mut next_pos = current_pos + 1;
 
-        // skip consecutive blank lines
         while next_pos < lines.len() && lines[next_pos].trim().is_empty() {
             next_pos += 1;
         }
 
-        // end of file is a boundary
         if next_pos >= lines.len() {
             return true;
         }
 
-        // check if next non-blank line is a valid subtitle index (u32 >= 1)
         let next_line = lines[next_pos].trim();
         if let Ok(index) = next_line.parse::<u32>() {
             index >= 1
