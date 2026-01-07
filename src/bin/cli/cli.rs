@@ -229,4 +229,32 @@ pub enum Commands {
         #[arg(long, value_name = "FORMAT")]
         format: ExportFormat,
     },
+
+    /// Generate prompts for LLM translation assistance
+    Prompt {
+        #[command(subcommand)]
+        command: PromptCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PromptCommands {
+    /// Generate translation prompt for subtitle range
+    Translate {
+        /// Path to the SRT file
+        #[arg(value_name = "FILE")]
+        file: String,
+
+        /// Subtitle range in format START-END (e.g., "1-50")
+        #[arg(value_name = "RANGE")]
+        range: String,
+
+        /// Target language for translation
+        #[arg(long, value_name = "LANGUAGE")]
+        language: String,
+
+        /// Custom template file path (default: uses built-in template)
+        #[arg(long, value_name = "FILE")]
+        template_file: Option<String>,
+    },
 }

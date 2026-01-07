@@ -2,9 +2,11 @@
 *.md
 !README.md
 !DEV.md
+!translate-prompt-template.md
 .env
 /out
 /*.zip
 /*.srt
 /backups
 .DS_Store
+!/docs/*.md

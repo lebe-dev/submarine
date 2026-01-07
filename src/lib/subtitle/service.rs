@@ -44,88 +44,159 @@ impl SubRipService {
         self.base_dir.join(filename)
     }
 
+    /// Check if a blank line at the given position is a block boundary
+    ///
+    /// A blank line is a block boundary if the next non-blank line is a valid subtitle index (u32 >= 1)
+    fn is_block_boundary(lines: &[&str], current_pos: usize) -> bool {
+        let mut next_pos = current_pos + 1;
+
+        while next_pos < lines.len() && lines[next_pos].trim().is_empty() {
+            next_pos += 1;
+        }
+
+        if next_pos >= lines.len() {
+            return true;
+        }
+
+        let next_line = lines[next_pos].trim();
+        if let Ok(index) = next_line.parse::<u32>() {
+            index >= 1
+        } else {
+            false
+        }
+    }
+
+    /// Helper to create subtitle with validation
+    fn create_subtitle(
+        index: u32,
+        start_time: u64,
+        end_time: u64,
+        text_lines: &[&str],
+        line_num: usize,
+    ) -> Result<Subtitle> {
+        let text = text_lines.join("\n");
+
+        let subtitle_index = SubtitleIndex::try_new(index)
+            .context(format!("line {}: invalid index value {}", line_num, index))?;
+
+        let subtitle_start =
+            SubtitleTimestamp::try_new(chrono::Duration::milliseconds(start_time as i64))
+                .context(format!("line {}: invalid start timestamp", line_num))?;
+
+        let subtitle_end =
+            SubtitleTimestamp::try_new(chrono::Duration::milliseconds(end_time as i64))
+                .context(format!("line {}: invalid end timestamp", line_num))?;
+
+        let subtitle_text = SubtitleText::try_new(text).context(format!(
+            "line {}: invalid subtitle text (empty or whitespace-only)",
+            line_num
+        ))?;
+
+        Subtitle::new(subtitle_index, subtitle_start, subtitle_end, subtitle_text)
+            .context(format!("line {}: failed to create subtitle", line_num))
+    }
+
     /// Parse SRT file content into a vector of subtitles
     ///
-    /// This parser expects well-formed SRT files. Files with formatting issues
-    /// (empty lines inside blocks, incorrect timestamps, etc.) should be fixed
-    /// using `sm doctor` command or manually before parsing.
+    /// This parser handles multi-line subtitles with blank lines within the text content.
+    /// Blank lines are treated as block separators only when followed by a valid subtitle index.
     fn parse_srt_file(content: &str) -> Result<Vec<Subtitle>> {
+        #[derive(Debug, PartialEq)]
+        enum ParserState {
+            ExpectingIndex,
+            ExpectingTimestamp,
+            ReadingText,
+        }
+
         let mut subtitles = Vec::new();
+        let lines: Vec<&str> = content.lines().collect();
+        let mut state = ParserState::ExpectingIndex;
 
-        let blocks: Vec<&str> = content.split("\n\n").collect();
+        let mut current_index: u32 = 0;
+        let mut current_start: u64 = 0;
+        let mut current_end: u64 = 0;
+        let mut text_lines: Vec<&str> = Vec::new();
+        let mut line_num;
 
-        for (block_num, block) in blocks.iter().enumerate() {
-            let trimmed_block = block.trim();
+        for (i, line) in lines.iter().enumerate() {
+            line_num = i + 1;
 
-            if trimmed_block.is_empty() {
-                continue;
-            }
+            match state {
+                ParserState::ExpectingIndex => {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
 
-            let lines: Vec<&str> = trimmed_block.lines().collect();
-
-            if lines.len() < 3 {
-                bail!(
-                    "block {}: insufficient lines (expected at least 3, got {})",
-                    block_num + 1,
-                    lines.len()
-                );
-            }
-
-            let index: u32 = lines[0].parse().context(format!(
-                "block {}: failed to parse index from '{}'",
-                block_num + 1,
-                lines[0]
-            ))?;
-
-            let timestamp_parts: Vec<&str> = lines[1].split(" --> ").collect();
-            if timestamp_parts.len() != 2 {
-                bail!(
-                    "block {}: invalid timestamp format '{}' (expected 'HH:MM:SS,mmm --> HH:MM:SS,mmm')",
-                    block_num + 1,
-                    lines[1]
-                );
-            }
-
-            let start_time =
-                Subtitle::parse_timestamp(timestamp_parts[0].trim()).context(format!(
-                    "block {}: failed to parse start timestamp '{}'",
-                    block_num + 1,
-                    timestamp_parts[0]
-                ))?;
-
-            let end_time =
-                Subtitle::parse_timestamp(timestamp_parts[1].trim()).context(format!(
-                    "block {}: failed to parse end timestamp '{}'",
-                    block_num + 1,
-                    timestamp_parts[1]
-                ))?;
-
-            let text = lines[2..].join("\n");
-
-            let subtitle_index = SubtitleIndex::try_new(index).context(format!(
-                "block {}: invalid index value {}",
-                block_num + 1,
-                index
-            ))?;
-
-            let subtitle_start = SubtitleTimestamp::try_new(start_time)
-                .context(format!("block {}: invalid start timestamp", block_num + 1))?;
-
-            let subtitle_end = SubtitleTimestamp::try_new(end_time)
-                .context(format!("block {}: invalid end timestamp", block_num + 1))?;
-
-            let subtitle_text = SubtitleText::try_new(text).context(format!(
-                "block {}: invalid subtitle text (empty or whitespace-only)",
-                block_num + 1
-            ))?;
-
-            let subtitle =
-                Subtitle::new(subtitle_index, subtitle_start, subtitle_end, subtitle_text)
-                    .context(format!(
-                        "block {}: failed to create subtitle",
-                        block_num + 1
+                    current_index = line.trim().parse().context(format!(
+                        "line {}: expected subtitle index, found '{}'",
+                        line_num,
+                        line.trim()
                     ))?;
 
+                    state = ParserState::ExpectingTimestamp;
+                }
+
+                ParserState::ExpectingTimestamp => {
+                    let parts: Vec<&str> = line.split(" --> ").collect();
+                    if parts.len() != 2 {
+                        bail!(
+                            "line {}: invalid timestamp format '{}' (expected 'HH:MM:SS,mmm --> HH:MM:SS,mmm')",
+                            line_num,
+                            line
+                        );
+                    }
+
+                    current_start = Subtitle::parse_timestamp(parts[0].trim())
+                        .context(format!(
+                            "line {}: failed to parse start timestamp '{}'",
+                            line_num, parts[0]
+                        ))?
+                        .num_milliseconds() as u64;
+
+                    current_end = Subtitle::parse_timestamp(parts[1].trim())
+                        .context(format!(
+                            "line {}: failed to parse end timestamp '{}'",
+                            line_num, parts[1]
+                        ))?
+                        .num_milliseconds() as u64;
+
+                    text_lines.clear();
+                    state = ParserState::ReadingText;
+                }
+
+                ParserState::ReadingText => {
+                    // check if this blank line is a block boundary
+                    if line.trim().is_empty() && Self::is_block_boundary(&lines, i) {
+                        // finalize current subtitle
+                        let subtitle = Self::create_subtitle(
+                            current_index,
+                            current_start,
+                            current_end,
+                            &text_lines,
+                            line_num,
+                        )?;
+                        subtitles.push(subtitle);
+                        state = ParserState::ExpectingIndex;
+                    } else {
+                        // add line to text (including blank lines within text)
+                        text_lines.push(line);
+                    }
+                }
+            }
+        }
+
+        // handle last subtitle if file doesn't end with blank line
+        if state == ParserState::ReadingText {
+            if text_lines.is_empty() {
+                bail!("line {}: incomplete subtitle (missing text)", lines.len());
+            }
+            let subtitle = Self::create_subtitle(
+                current_index,
+                current_start,
+                current_end,
+                &text_lines,
+                lines.len(),
+            )?;
             subtitles.push(subtitle);
         }
 
@@ -557,7 +628,7 @@ mod tests {
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("failed to parse index"));
+        assert!(err_msg.contains("expected subtitle index") || err_msg.contains("invalid digit"));
     }
 
     #[test]
@@ -644,7 +715,96 @@ mod tests {
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("insufficient lines"));
+        assert!(err_msg.contains("incomplete subtitle") || err_msg.contains("missing text"));
+    }
+
+    // Tests for blank lines within subtitle text
+
+    #[test]
+    fn test_parse_srt_with_blank_line_in_text() {
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nFirst line\n\nSecond line";
+
+        let result = SubRipService::parse_srt_file(content);
+        assert!(result.is_ok());
+
+        let subtitles = result.unwrap();
+        assert_eq!(subtitles.len(), 1);
+        assert_eq!(subtitles[0].text.as_ref(), "First line\n\nSecond line");
+    }
+
+    #[test]
+    fn test_parse_srt_multiple_blank_lines_in_text() {
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nLine 1\n\n\nLine 2";
+
+        let result = SubRipService::parse_srt_file(content);
+        assert!(result.is_ok());
+
+        let subtitles = result.unwrap();
+        assert_eq!(subtitles.len(), 1);
+        assert_eq!(subtitles[0].text.as_ref(), "Line 1\n\n\nLine 2");
+    }
+
+    #[test]
+    fn test_parse_srt_file_ends_without_blank_line() {
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nText without trailing blank";
+
+        let result = SubRipService::parse_srt_file(content);
+        assert!(result.is_ok());
+
+        let subtitles = result.unwrap();
+        assert_eq!(subtitles.len(), 1);
+        assert_eq!(subtitles[0].text.as_ref(), "Text without trailing blank");
+    }
+
+    #[test]
+    fn test_parse_srt_with_leading_blank_lines() {
+        let content = "\n\n1\n00:00:01,000 --> 00:00:02,000\nText";
+
+        let result = SubRipService::parse_srt_file(content);
+        assert!(result.is_ok());
+
+        let subtitles = result.unwrap();
+        assert_eq!(subtitles.len(), 1);
+        assert_eq!(subtitles[0].text.as_ref(), "Text");
+    }
+
+    #[test]
+    fn test_parse_srt_multiple_subtitles_with_blank_text() {
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nText A\n\nMore A\n\n2\n00:00:03,000 --> 00:00:04,000\nText B";
+
+        let result = SubRipService::parse_srt_file(content);
+        assert!(result.is_ok());
+
+        let subs = result.unwrap();
+        assert_eq!(subs.len(), 2);
+        assert_eq!(subs[0].text.as_ref(), "Text A\n\nMore A");
+        assert_eq!(subs[1].text.as_ref(), "Text B");
+    }
+
+    #[test]
+    fn test_parse_srt_multiple_blank_lines_between_blocks() {
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nFirst\n\n\n\n2\n00:00:03,000 --> 00:00:04,000\nSecond";
+
+        let result = SubRipService::parse_srt_file(content);
+        assert!(result.is_ok());
+
+        let subs = result.unwrap();
+        assert_eq!(subs.len(), 2);
+        assert_eq!(subs[0].text.as_ref(), "First");
+        assert_eq!(subs[1].text.as_ref(), "Second");
+    }
+
+    #[test]
+    fn test_parse_srt_complex_multiline_with_blanks() {
+        let content = "1\n00:00:01,000 --> 00:00:03,000\nLine 1\n\nLine 2\nLine 3\n\nLine 4\n\n2\n00:00:04,000 --> 00:00:06,000\nSimple";
+
+        let result = SubRipService::parse_srt_file(content);
+        assert!(result.is_ok());
+
+        let subs = result.unwrap();
+        assert_eq!(subs.len(), 2);
+        assert_eq!(subs[0].text.as_ref(), "Line 1\n\nLine 2\nLine 3\n\nLine 4");
+        assert_eq!(subs[1].text.as_ref(), "Simple");
     }
 
     // Tests for set functionality

@@ -148,3 +148,44 @@ fn test_parse_well_formed_srt_file() {
 
     println!("Successfully verified parser works with well-formed SRT files");
 }
+
+#[test]
+fn test_parse_russian_srt_with_blank_lines() {
+    // Test parsing of Russian subtitle file with blank lines within text
+    let service = SubRipService::new(PathBuf::from("."));
+    let filename = "test.rus.srt";
+
+    let result = service.get_all(filename);
+    assert!(
+        result.is_ok(),
+        "Failed to parse test.rus.srt: {:?}",
+        result.err()
+    );
+
+    let subtitles = result.unwrap();
+    assert_eq!(subtitles.len(), 4, "Expected 4 subtitles in test.rus.srt");
+
+    // Verify block 3 contains both lines with blank line preserved
+    let sub3 = &subtitles[2]; // 0-indexed
+    assert_eq!(*sub3.index.as_ref(), 3);
+    assert_eq!(
+        sub3.text.as_ref(),
+        "Может, он не умер.\n\nЧто?",
+        "Block 3 should contain both lines separated by blank line"
+    );
+
+    // Verify other subtitles parsed correctly
+    let sub1 = &subtitles[0];
+    assert_eq!(*sub1.index.as_ref(), 1);
+    assert_eq!(sub1.text.as_ref(), "Ранее в сериале...");
+
+    let sub2 = &subtitles[1];
+    assert_eq!(*sub2.index.as_ref(), 2);
+    assert_eq!(sub2.text.as_ref(), "Залезай!");
+
+    let sub4 = &subtitles[3];
+    assert_eq!(*sub4.index.as_ref(), 4);
+    assert_eq!(sub4.text.as_ref(), "Мы должны вернуться и проверить.");
+
+    println!("Successfully parsed Russian SRT file with blank lines in subtitle text");
+}
