@@ -9,3 +9,4 @@
 /*.srt
 /backups
 .DS_Store
+!/docs/*.md

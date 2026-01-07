@@ -13,6 +13,8 @@ Submarine is designed to assist the translation process by providing various edi
 ## Features
 
 - Subtitle formats: [SubRip](https://en.wikipedia.org/wiki/SubRip), .srt
+- Support flows: 
+  - Chatbot: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md)
 - **Toolset:**
   - Get subtitle by index
   - Add a new subtitle
@@ -129,11 +131,7 @@ $ sm export movie.eng.srt 1-50 --format=anchored
 
 ## Usage in chat with LLM
 
-Save content into srt-file and check:
-
-```bash
-sm doctor your-file.srt
-```
+- [Chatbot translation flow](docs/CHATBOT-TRANSLATION-FLOW.md)
 
 ## Usage with LLM agent
 
