@@ -1,42 +1,9 @@
+use crate::utils;
 use lib::subtitle::model::SubtitleError;
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
 use log::{debug, error, info};
 use std::path::Path;
-
-/// Parse range string in format "START-END" into (start, end) tuple
-fn parse_range(range: &str) -> anyhow::Result<(u32, u32)> {
-    let parts: Vec<&str> = range.split('-').collect();
-
-    if parts.len() != 2 {
-        error!("invalid range format: {}", range);
-        eprintln!(
-            "error: Invalid range format '{}'. Expected format: START-END (e.g., 120-123)",
-            range
-        );
-        std::process::exit(1);
-    }
-
-    let start = parts[0].trim().parse::<u32>().map_err(|_| {
-        error!("invalid start index in range: {}", parts[0]);
-        eprintln!(
-            "error: Invalid start index '{}'. Must be a positive number",
-            parts[0]
-        );
-        std::process::exit(1);
-    })?;
-
-    let end = parts[1].trim().parse::<u32>().map_err(|_| {
-        error!("invalid end index in range: {}", parts[1]);
-        eprintln!(
-            "error: Invalid end index '{}'. Must be a positive number",
-            parts[1]
-        );
-        std::process::exit(1);
-    })?;
-
-    Ok((start, end))
-}
 
 pub fn handle(file: &str, index_str: &str) -> anyhow::Result<()> {
     if index_str.contains('-') {
@@ -145,29 +112,8 @@ pub fn handle(file: &str, index_str: &str) -> anyhow::Result<()> {
 fn handle_range(file: &str, range: &str) -> anyhow::Result<()> {
     info!("getting subtitles in range {} from file: {}", range, file);
 
-    let (start, end) = parse_range(range)?;
+    let (start, end) = utils::parse_range(range)?;
     debug!("parsed range: start={}, end={}", start, end);
-
-    if start < 1 {
-        error!("invalid start index: must be >= 1");
-        eprintln!("error: Start index must be >= 1, got {}", start);
-        std::process::exit(1);
-    }
-
-    if end < 1 {
-        error!("invalid end index: must be >= 1");
-        eprintln!("error: End index must be >= 1, got {}", end);
-        std::process::exit(1);
-    }
-
-    if start > end {
-        error!("invalid range: start {} > end {}", start, end);
-        eprintln!(
-            "error: Start index must be <= end index (got {} > {})",
-            start, end
-        );
-        std::process::exit(1);
-    }
 
     let file_path = Path::new(file);
     debug!("parsing file path: {:?}", file_path);

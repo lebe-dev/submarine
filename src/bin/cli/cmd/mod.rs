@@ -6,6 +6,7 @@ pub mod get;
 pub mod import;
 pub mod info;
 pub mod mass_rename;
+pub mod prompt;
 pub mod set;
 pub mod translation_status;
 pub mod verify;
