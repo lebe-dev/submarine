@@ -1758,7 +1758,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "submarine"
+name = "submarine-rs"
 version = "0.12.0"
 dependencies = [
  "anyhow",
