@@ -130,6 +130,5 @@ $ sm export --format=anchored movie.eng.srt 1-50
 
 ## RoadMap
 
-- Feature: adjust timestamps
 - Feature: sync
 - Feature: merge
