@@ -19,12 +19,10 @@ Submarine is designed to assist the translation process by providing various edi
 - **Toolset:**
   - Get subtitle by index
   - Add a new subtitle
-  - Set subtitle by offset
+  - Import subtitles from file
+  - Update subtitle by offset
   - Mass-rename subtitle files
-  - Export subtitles in various formats (anchored)
-- **Validation:**
-  - Check integrity
-  - Compare with another subtitle files (quantity of subtitles, timestamps, etc). For example, you can compare english subtitles with translated by LLM.
+  - Export subtitles in anchored format
 - **Verification:**
   - Verify translated subtitles against the original content
   - Track translation progress
