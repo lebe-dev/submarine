@@ -130,16 +130,8 @@ $ sm export movie.eng.srt 1-50 --format=anchored
 [50] See you tomorrow.
 ```
 
-## Usage in chat with LLM
-
-- [Chatbot translation flow](docs/CHATBOT-TRANSLATION-FLOW.md)
-
-## Usage with LLM agent
-
-Put `sm` usage description in `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` or whatever and tell LLM to use it as a tool.
-
 ## RoadMap
 
+- Feature: adjust timestamps
 - Feature: sync
 - Feature: merge
-- Feature: adjust timestamps
