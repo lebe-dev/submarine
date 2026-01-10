@@ -8,6 +8,12 @@ use std::path::Path;
 
 pub struct CsvImportService;
 
+impl Default for CsvImportService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CsvImportService {
     pub fn new() -> Self {
         Self
@@ -109,6 +115,12 @@ impl ImportService for CsvImportService {
 
 pub struct AnchoredImportService;
 
+impl Default for AnchoredImportService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnchoredImportService {
     pub fn new() -> Self {
         Self
@@ -180,18 +192,16 @@ impl ImportService for AnchoredImportService {
                 current_index = Some(index);
                 current_text = first_line_text;
                 current_line_number = line_number;
-            } else {
-                if current_index.is_some() {
-                    if !current_text.is_empty() {
-                        current_text.push('\n');
-                    }
-                    current_text.push_str(line);
-                } else if !line.trim().is_empty() {
-                    return Err(SubtitleError::AnchoredParseError {
-                        line: line_number,
-                        message: "Text line found before any [INDEX] marker".to_string(),
-                    });
+            } else if current_index.is_some() {
+                if !current_text.is_empty() {
+                    current_text.push('\n');
                 }
+                current_text.push_str(line);
+            } else if !line.trim().is_empty() {
+                return Err(SubtitleError::AnchoredParseError {
+                    line: line_number,
+                    message: "Text line found before any [INDEX] marker".to_string(),
+                });
             }
         }
 

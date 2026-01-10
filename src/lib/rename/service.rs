@@ -45,11 +45,11 @@ impl RenameService for FileRenameService {
                 continue;
             }
 
-            if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                if filename.to_lowercase().contains(&mask_lower) {
-                    debug!("found file: {:?}", path);
-                    found_files.push(path);
-                }
+            if let Some(filename) = path.file_name().and_then(|n| n.to_str())
+                && filename.to_lowercase().contains(&mask_lower)
+            {
+                debug!("found file: {:?}", path);
+                found_files.push(path);
             }
         }
 

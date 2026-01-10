@@ -189,10 +189,10 @@ fn detect_index_offset(
                 continue;
             }
 
-            if let Some(target_sub) = target_map.get(&(target_idx as u32)) {
-                if timestamps_match(&entry.ref_subtitle, target_sub) {
-                    *offset_counts.entry(offset).or_insert(0) += 1;
-                }
+            if let Some(target_sub) = target_map.get(&(target_idx as u32))
+                && timestamps_match(&entry.ref_subtitle, target_sub)
+            {
+                *offset_counts.entry(offset).or_insert(0) += 1;
             }
         }
     }

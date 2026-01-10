@@ -129,7 +129,7 @@ impl App {
         }
 
         match self.input_buffer.parse::<usize>() {
-            Ok(user_index) if user_index == 0 => {
+            Ok(0) => {
                 self.input_error = Some("subtitle numbers start at 1".to_string());
             }
             Ok(user_index) => {
@@ -170,18 +170,17 @@ impl App {
         for i in 0..max_len {
             let mut found = false;
 
-            if let Some(sub) = self.subtitles1.get(i) {
-                if sub.text.as_ref().to_lowercase().contains(&search_text) {
-                    found = true;
-                }
+            if let Some(sub) = self.subtitles1.get(i)
+                && sub.text.as_ref().to_lowercase().contains(&search_text)
+            {
+                found = true;
             }
 
-            if !found {
-                if let Some(sub) = self.subtitles2.get(i) {
-                    if sub.text.as_ref().to_lowercase().contains(&search_text) {
-                        found = true;
-                    }
-                }
+            if !found
+                && let Some(sub) = self.subtitles2.get(i)
+                && sub.text.as_ref().to_lowercase().contains(&search_text)
+            {
+                found = true;
             }
 
             if found {
@@ -207,39 +206,39 @@ impl App {
 
     /// Jump to next search match
     fn next_match(&mut self) {
-        if let Some(current) = self.current_match_index {
-            if !self.search_matches.is_empty() {
-                let next = (current + 1) % self.search_matches.len();
-                self.current_match_index = Some(next);
-                self.selected_index = self.search_matches[next];
-                self.should_center_on_next_render = true;
-                debug!(
-                    "jumping to next match {} of {}",
-                    next + 1,
-                    self.search_matches.len()
-                );
-            }
+        if let Some(current) = self.current_match_index
+            && !self.search_matches.is_empty()
+        {
+            let next = (current + 1) % self.search_matches.len();
+            self.current_match_index = Some(next);
+            self.selected_index = self.search_matches[next];
+            self.should_center_on_next_render = true;
+            debug!(
+                "jumping to next match {} of {}",
+                next + 1,
+                self.search_matches.len()
+            );
         }
     }
 
     /// Jump to previous search match
     fn prev_match(&mut self) {
-        if let Some(current) = self.current_match_index {
-            if !self.search_matches.is_empty() {
-                let prev = if current == 0 {
-                    self.search_matches.len() - 1
-                } else {
-                    current - 1
-                };
-                self.current_match_index = Some(prev);
-                self.selected_index = self.search_matches[prev];
-                self.should_center_on_next_render = true;
-                debug!(
-                    "jumping to previous match {} of {}",
-                    prev + 1,
-                    self.search_matches.len()
-                );
-            }
+        if let Some(current) = self.current_match_index
+            && !self.search_matches.is_empty()
+        {
+            let prev = if current == 0 {
+                self.search_matches.len() - 1
+            } else {
+                current - 1
+            };
+            self.current_match_index = Some(prev);
+            self.selected_index = self.search_matches[prev];
+            self.should_center_on_next_render = true;
+            debug!(
+                "jumping to previous match {} of {}",
+                prev + 1,
+                self.search_matches.len()
+            );
         }
     }
 
@@ -317,13 +316,13 @@ where
     loop {
         terminal.draw(|f| ui(f, app))?;
 
-        if event::poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                match app.mode {
-                    AppMode::Normal => handle_normal_mode_input(app, key.code),
-                    AppMode::JumpInput => handle_jump_input_mode(app, key.code),
-                    AppMode::SearchInput => handle_search_input_mode(app, key.code),
-                }
+        if event::poll(std::time::Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+        {
+            match app.mode {
+                AppMode::Normal => handle_normal_mode_input(app, key.code),
+                AppMode::JumpInput => handle_jump_input_mode(app, key.code),
+                AppMode::SearchInput => handle_search_input_mode(app, key.code),
             }
         }
 

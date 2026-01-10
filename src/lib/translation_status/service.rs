@@ -67,13 +67,13 @@ pub fn check_translation_status(
         let mut end_index = start_index;
         let mut count = 1;
 
-        for i in 1..missing.len() {
+        for item in missing.iter().skip(1) {
             if count >= chunk_size {
                 break;
             }
 
-            if missing[i] == end_index + 1 {
-                end_index = missing[i];
+            if *item == end_index + 1 {
+                end_index = *item;
                 count += 1;
             } else {
                 break;

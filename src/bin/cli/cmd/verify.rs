@@ -29,21 +29,15 @@ pub fn handle(file1: &str, file2: &str, range: Option<&str>) -> anyhow::Result<(
 
         info!("filtering subtitles to range {}-{}", start, end);
 
-        ref_subs = ref_subs
-            .into_iter()
-            .filter(|s| {
-                let index = *s.index.as_ref();
-                index >= start && index <= end
-            })
-            .collect();
+        ref_subs.retain(|s| {
+            let index = *s.index.as_ref();
+            index >= start && index <= end
+        });
 
-        target_subs = target_subs
-            .into_iter()
-            .filter(|s| {
-                let index = *s.index.as_ref();
-                index >= start && index <= end
-            })
-            .collect();
+        target_subs.retain(|s| {
+            let index = *s.index.as_ref();
+            index >= start && index <= end
+        });
 
         debug!(
             "after filtering: {} ref subtitles, {} target subtitles",

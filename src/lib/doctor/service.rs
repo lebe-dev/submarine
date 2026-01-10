@@ -158,19 +158,19 @@ impl DoctorService for SubRipDoctorService {
                                 severity: Severity::Error,
                                 context: None,
                             });
-                        } else if let Ok(idx) = line.trim().parse::<u32>() {
-                            if idx < 1 {
-                                issues.push(ValidationIssue {
-                                    line_number,
-                                    block_number: Some(current_block),
-                                    issue_type: IssueType::InvalidIndex {
-                                        value: line.to_string(),
-                                        reason: "must be >= 1".to_string(),
-                                    },
-                                    severity: Severity::Error,
-                                    context: None,
-                                });
-                            }
+                        } else if let Ok(idx) = line.trim().parse::<u32>()
+                            && idx < 1
+                        {
+                            issues.push(ValidationIssue {
+                                line_number,
+                                block_number: Some(current_block),
+                                issue_type: IssueType::InvalidIndex {
+                                    value: line.to_string(),
+                                    reason: "must be >= 1".to_string(),
+                                },
+                                severity: Severity::Error,
+                                context: None,
+                            });
                         }
                         state = ParserState::ExpectingTimestamp;
                     }
@@ -276,7 +276,7 @@ impl DoctorService for SubRipDoctorService {
                     count: empty_line_count,
                 },
                 severity: Severity::Warning,
-                context: Some(format!("trailing empty lines")),
+                context: Some("trailing empty lines".to_string()),
             });
         }
 
@@ -321,7 +321,7 @@ impl DoctorService for SubRipDoctorService {
         let mut issues_fixed = 0;
         let unfixable_issues = Vec::new();
 
-        for (_line_num, line) in lines.iter().enumerate() {
+        for line in lines.iter() {
             let is_empty = line.trim().is_empty();
 
             match state {
