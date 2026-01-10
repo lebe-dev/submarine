@@ -1,6 +1,6 @@
 [package]
 name = "submarine-rs"
-version = "0.13.0"
+version = "0.13.1"
 description = "Toolkit for subtitle processing"
 edition = "2024"
 authors = ["Eugene Lebedev <eugene.0x90@gmail.com>"]
