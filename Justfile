@@ -6,7 +6,11 @@ init:
 run-examples:
   cargo run --example subtitle_usage
 
-build:
+lint:
+    cargo fmt -- --check
+    cargo clippy -- -D warnings
+
+build: lint
   cargo build --bin sm
 
 test:
@@ -35,7 +39,7 @@ coverage-open:
 coverage-clean:
   cargo llvm-cov clean --workspace
 
-release-linux: test-all
+release-linux: test-all && lint
   rm -f sm
   rm -rf out
   mkdir -p out
@@ -48,7 +52,7 @@ release-linux: test-all
   zip -9 -r sm-{{version}}-linux-amd64.zip sm
   rm -f sm
 
-release-macos: test-all
+release-macos: test-all && lint
   cargo build --release --bin sm
   cp target/release/sm sm
   zip -9 -r sm-{{version}}-macos-arm64.zip sm
