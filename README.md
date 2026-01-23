@@ -134,6 +134,10 @@ $ sm export --format=anchored movie.eng.srt 1-50
 [50] See you tomorrow.
 ```
 
+## How to use as library
+
+In addition to its command-line interface, Submarine can be used as a library in your own Rust projects. For detailed information on how to integrate it, please see the [library documentation](docs/LIBRARY.md).
+
 ## RoadMap
 
 - Code refactoring
