@@ -4,7 +4,10 @@ init:
   cargo install cargo-llvm-cov
 
 run-examples:
-  cargo run --example subtitle_usage
+  @echo "Running example: simple"
+  @cargo run --example simple
+  @echo "Running example: subtitle_usage"
+  @cargo run --example subtitle_usage
 
 lint:
     cargo fmt -- --check
