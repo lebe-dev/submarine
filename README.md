@@ -28,6 +28,27 @@ Submarine is designed to assist the translation process by providing various edi
   - Track translation progress
 - **Auto-backups:** automatically create backups of your subtitle files before making changes.
 
+## Installation
+
+### MacOS
+
+Homebrew ([lebe-dev tap](https://github.com/lebe-dev/homebrew-tap)):
+
+```bash
+brew install lebe-dev/tap/submarine
+```
+
+### Linux
+
+```bash
+curl -L -o sm-0.13.1-linux-amd64.zip \
+  https://github.com/lebe-dev/submarine/releases/download/0.13.1/sm-0.13.1-linux-amd64.zip
+unzip sm-0.13.1-linux-amd64.zip
+sudo install -m 0755 sm /usr/local/bin/sm
+sm --help
+```
+
+
 ## Usage
 
 ```bash
