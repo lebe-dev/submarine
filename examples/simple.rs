@@ -20,7 +20,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut subtitles = service.get_all(sample_filename)?;
 
-    println!("Loaded {} subtitles from {}:", subtitles.len(), sample_filename);
+    println!(
+        "Loaded {} subtitles from {}:",
+        subtitles.len(),
+        sample_filename
+    );
     for sub in &subtitles {
         println!("{}", sub.to_string().trim());
         println!("---");
@@ -37,7 +41,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Created new subtitle:\n{}", new_subtitle);
     subtitles.push(new_subtitle);
 
-
     // Example 3: Save the modified list of subtitles to a new file
     println!("\n--- Saving subtitles to a file ---");
     service.write_all(output_filename, &subtitles)?;
@@ -48,7 +51,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Content of {} ---", output_filename);
     println!("{}", output_content.trim());
     println!("---");
-
 
     // Clean up the created files
     fs::remove_file(&sample_filepath)?;
