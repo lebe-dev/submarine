@@ -1,6 +1,7 @@
 /target
 *.md
 !README.md
+!README.*.md
 !DEV.md
 !translate-prompt-template.md
 .env
