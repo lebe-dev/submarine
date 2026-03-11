@@ -1,23 +1,26 @@
-use lib::subtitle::model::{Subtitle, SubtitleError};
+use crate::cli::OutputFormat;
+use crate::dto::{ChunkDto, TranslationStatusDto};
+use crate::json_output::{output_error, output_success};
+use crate::utils;
+use lib::subtitle::model::Subtitle;
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
-use lib::translation_status::model::TranslationStatusReport;
 use lib::translation_status::service;
-use log::{debug, error, info};
-use std::path::Path;
+use log::{debug, info};
 
-/// Entry point for the translation-status command
-///
-/// Loads reference and translation SRT files and checks translation progress.
-/// The reference file is the authoritative source of what needs translation.
-pub fn handle(reference: &str, translation: &str, chunk_size: usize) -> anyhow::Result<()> {
+pub fn handle(
+    reference: &str,
+    translation: &str,
+    chunk_size: usize,
+    format: &OutputFormat,
+) -> anyhow::Result<()> {
     info!(
         "checking translation status for {} against {}",
         translation, reference
     );
 
-    let (ref_subs, ref_filename) = load_subtitle_file(reference)?;
-    let (translation_subs, translation_filename) = load_subtitle_file(translation)?;
+    let (ref_subs, ref_filename) = load_subtitle_file(reference, format)?;
+    let (translation_subs, translation_filename) = load_subtitle_file(translation, format)?;
 
     debug!(
         "loaded {} reference and {} translation subtitles",
@@ -25,11 +28,9 @@ pub fn handle(reference: &str, translation: &str, chunk_size: usize) -> anyhow::
         translation_subs.len()
     );
 
-    // Check for empty reference file
     if ref_subs.is_empty() {
-        error!("reference file is empty");
-        eprintln!("error: reference file is empty");
-        std::process::exit(1);
+        output_error(format, "empty_file", "reference file is empty", None);
+        return Err(anyhow::anyhow!(""));
     }
 
     let report = service::check_translation_status(
@@ -40,7 +41,23 @@ pub fn handle(reference: &str, translation: &str, chunk_size: usize) -> anyhow::
         chunk_size,
     );
 
-    display_report(&report);
+    let dto = TranslationStatusDto {
+        ref_file: report.ref_file.clone(),
+        translation_file: report.translation_file.clone(),
+        total_count: report.total_count,
+        translated_count: report.translated_count,
+        missing_count: report.missing_count,
+        progress_percentage: report.progress_percentage(),
+        is_complete: report.is_complete(),
+        next_chunk: report.next_chunk.as_ref().map(|c| ChunkDto {
+            start_index: c.start_index,
+            end_index: c.end_index,
+        }),
+    };
+
+    output_success(format, &dto, || {
+        display_report(&report);
+    });
 
     info!(
         "translation progress: {}/{} ({:.1}%)",
@@ -52,105 +69,40 @@ pub fn handle(reference: &str, translation: &str, chunk_size: usize) -> anyhow::
     Ok(())
 }
 
-/// Load and validate a subtitle file
-///
-/// Performs path canonicalization with traversal protection,
-/// loads subtitles using SubRipService, and returns the subtitles
-/// along with the filename for display.
-fn load_subtitle_file(file: &str) -> anyhow::Result<(Vec<Subtitle>, String)> {
+fn load_subtitle_file(
+    file: &str,
+    format: &OutputFormat,
+) -> anyhow::Result<(Vec<Subtitle>, String)> {
     debug!("loading subtitle file: {}", file);
 
-    let file_path = Path::new(file);
-    debug!("parsing file path: {:?}", file_path);
+    let resolved = utils::resolve_existing_path(file)?;
+    let service = SubRipService::new(resolved.base_dir);
 
-    if file_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(file_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", file_path);
-            return Err(anyhow::anyhow!(
-                "invalid file path: path traversal not allowed"
-            ));
-        }
-    }
-
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("invalid file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("invalid file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("filename: {}", filename);
-
-    let service = SubRipService::new(base_dir);
-    debug!("loading subtitles from file: {}", filename);
-
-    match service.get_all(&filename) {
+    match service.get_all(&resolved.filename) {
         Ok(subtitles) => {
             info!(
                 "successfully loaded {} subtitle(s) from {}",
                 subtitles.len(),
-                filename
+                resolved.filename
             );
-            Ok((subtitles, filename))
+            Ok((subtitles, resolved.filename))
         }
         Err(e) => {
-            debug!("error occurred: {:?}", e);
-            match e {
-                SubtitleError::FileNotFound(path) => {
-                    error!("file not found: {}", path);
-                    eprintln!("error: file not found: {}", path);
-                }
-                SubtitleError::InvalidPath(msg) => {
-                    error!("invalid file path: {}", msg);
-                    eprintln!("error: invalid file path: {}", msg);
-                }
-                SubtitleError::ParseError(err) => {
-                    error!("parse error: {}", err);
-                    eprintln!("error: failed to parse subtitle file: {}", err);
-                    eprintln!("hint: try running 'sm doctor --fix {}' first", filename);
-                }
-                SubtitleError::IoError(err) => {
-                    error!("i/o error: {}", err);
-                    eprintln!("error: failed to read file: {}", err);
-                }
-                _ => {
-                    error!("unexpected error: {}", e);
-                    eprintln!("error: {}", e);
-                }
-            }
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, file);
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            Err(anyhow::anyhow!(""))
         }
     }
 }
 
-/// Display the translation status report to the user
-fn display_report(report: &TranslationStatusReport) {
+fn display_report(report: &lib::translation_status::model::TranslationStatusReport) {
     let percentage = report.progress_percentage();
 
-    // Show exactly 100% only when translation is complete
-    // Otherwise show one decimal place to avoid misleading rounding
     if report.is_complete() {
         println!(
             "Progress: {}/{} (100%)",

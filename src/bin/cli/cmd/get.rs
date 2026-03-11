@@ -1,167 +1,81 @@
+use crate::cli::OutputFormat;
+use crate::dto::SubtitleDto;
+use crate::json_output::{output_error, output_success};
 use crate::utils;
-use lib::subtitle::model::SubtitleError;
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
-use log::{debug, error, info};
-use std::path::Path;
+use log::{debug, info};
+use serde::Serialize;
 
-pub fn handle(file: &str, index_str: &str) -> anyhow::Result<()> {
+#[derive(Serialize)]
+struct GetRangeDto {
+    subtitles: Vec<SubtitleDto>,
+    count: usize,
+    range_start: u32,
+    range_end: u32,
+}
+
+pub fn handle(file: &str, index_str: &str, format: &OutputFormat) -> anyhow::Result<()> {
     if index_str.contains('-') {
         debug!("detected range format, processing range");
-        return handle_range(file, index_str);
+        return handle_range(file, index_str, format);
     }
 
     let index = index_str.parse::<u32>().map_err(|_| {
-        error!("invalid index: {}", index_str);
-        eprintln!(
-            "error: Invalid index '{}'. Must be a positive number or range (e.g., 120-123)",
+        anyhow::anyhow!(
+            "Invalid index '{}'. Must be a positive number or range (e.g., 120-123)",
             index_str
-        );
-        std::process::exit(1);
+        )
     })?;
 
     info!("getting subtitle {} from file: {}", index, file);
 
-    let file_path = Path::new(file);
-    debug!("parsing file path: {:?}", file_path);
-
-    if file_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(file_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("Failed to resolve file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("Failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", file_path);
-            return Err(anyhow::anyhow!(
-                "Invalid file path: path traversal not allowed"
-            ));
-        }
-    }
-
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("Failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("Invalid file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("Invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("filename: {}", filename);
-
-    let service = SubRipService::new(base_dir);
+    let resolved = utils::resolve_existing_path(file)?;
+    let service = SubRipService::new(resolved.base_dir);
 
     debug!("retrieving subtitle by id: {}..", index);
-    match service.get_by_id(&filename, index) {
+    match service.get_by_id(&resolved.filename, index) {
         Ok(Some(subtitle)) => {
             info!("subtitle {} found successfully", index);
-            debug!("subtitle content: {:?}", subtitle);
-            println!("{}", subtitle);
+            let dto = SubtitleDto::from_subtitle(&subtitle);
+            output_success(format, &dto, || {
+                println!("{}", subtitle);
+            });
             Ok(())
         }
         Ok(None) => {
-            info!("subtitle {} not found in file", index);
-            eprintln!("subtitle with index {} not found in {}", index, file);
-            std::process::exit(1);
+            output_error(
+                format,
+                "subtitle_not_found",
+                &format!("subtitle with index {} not found in {}", index, file),
+                None,
+            );
+            Err(anyhow::anyhow!(""))
         }
         Err(e) => {
-            debug!("error occurred: {:?}", e);
-            match e {
-                SubtitleError::FileNotFound(path) => {
-                    info!("file not found: {}", path);
-                    eprintln!("error: File not found: {}", path);
-                }
-                SubtitleError::InvalidPath(msg) => {
-                    error!("invalid file path: {}", msg);
-                    eprintln!("error: Invalid file path: {}", msg);
-                }
-                SubtitleError::ParseError(err) => {
-                    error!("parse error: {}", err);
-                    eprintln!("error: Failed to parse subtitle file: {}", err);
-                }
-                SubtitleError::IoError(err) => {
-                    error!("i/o error: {}", err);
-                    eprintln!("error: Failed to read file: {}", err);
-                }
-                _ => {
-                    error!("unexpected error: {}", e);
-                    eprintln!("error: {}", e);
-                }
-            }
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, file);
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            Err(anyhow::anyhow!(""))
         }
     }
 }
 
-fn handle_range(file: &str, range: &str) -> anyhow::Result<()> {
+fn handle_range(file: &str, range: &str, format: &OutputFormat) -> anyhow::Result<()> {
     info!("getting subtitles in range {} from file: {}", range, file);
 
     let (start, end) = utils::parse_range(range)?;
     debug!("parsed range: start={}, end={}", start, end);
 
-    let file_path = Path::new(file);
-    debug!("parsing file path: {:?}", file_path);
-
-    if file_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(file_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("Failed to resolve file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("Failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", file_path);
-            return Err(anyhow::anyhow!(
-                "Invalid file path: path traversal not allowed"
-            ));
-        }
-    }
-
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("Failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("Invalid file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("Invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("filename: {}", filename);
-
-    let service = SubRipService::new(base_dir);
+    let resolved = utils::resolve_existing_path(file)?;
+    let service = SubRipService::new(resolved.base_dir);
 
     debug!("retrieving all subtitles for filtering..");
-    match service.get_all(&filename) {
+    match service.get_all(&resolved.filename) {
         Ok(subtitles) => {
             debug!("found {} total subtitles", subtitles.len());
 
@@ -182,7 +96,15 @@ fn handle_range(file: &str, range: &str) -> anyhow::Result<()> {
 
             if range_subtitles.is_empty() {
                 info!("no subtitles found in range {}-{}", start, end);
-                println!("No subtitles found in range {}-{}", start, end);
+                let dto = GetRangeDto {
+                    subtitles: vec![],
+                    count: 0,
+                    range_start: start,
+                    range_end: end,
+                };
+                output_success(format, &dto, || {
+                    println!("No subtitles found in range {}-{}", start, end);
+                });
             } else {
                 info!(
                     "found {} subtitle(s) in range {}-{}",
@@ -191,43 +113,39 @@ fn handle_range(file: &str, range: &str) -> anyhow::Result<()> {
                     end
                 );
 
-                for (i, subtitle) in range_subtitles.iter().enumerate() {
-                    print!("{}", subtitle);
-                    if i < range_subtitles.len() - 1 {
-                        println!("\n");
-                    } else {
-                        println!();
+                let dto = GetRangeDto {
+                    subtitles: range_subtitles
+                        .iter()
+                        .map(SubtitleDto::from_subtitle)
+                        .collect(),
+                    count: range_subtitles.len(),
+                    range_start: start,
+                    range_end: end,
+                };
+
+                output_success(format, &dto, || {
+                    for (i, subtitle) in range_subtitles.iter().enumerate() {
+                        print!("{}", subtitle);
+                        if i < range_subtitles.len() - 1 {
+                            println!("\n");
+                        } else {
+                            println!();
+                        }
                     }
-                }
+                });
             }
 
             Ok(())
         }
         Err(e) => {
-            debug!("error occurred: {:?}", e);
-            match e {
-                SubtitleError::FileNotFound(path) => {
-                    info!("file not found: {}", path);
-                    eprintln!("error: File not found: {}", path);
-                }
-                SubtitleError::InvalidPath(msg) => {
-                    error!("invalid file path: {}", msg);
-                    eprintln!("error: Invalid file path: {}", msg);
-                }
-                SubtitleError::ParseError(err) => {
-                    error!("parse error: {}", err);
-                    eprintln!("error: Failed to parse subtitle file: {}", err);
-                }
-                SubtitleError::IoError(err) => {
-                    error!("i/o error: {}", err);
-                    eprintln!("error: Failed to read file: {}", err);
-                }
-                _ => {
-                    error!("unexpected error: {}", e);
-                    eprintln!("error: {}", e);
-                }
-            }
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, file);
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            Err(anyhow::anyhow!(""))
         }
     }
 }

@@ -1,10 +1,11 @@
-use crate::cli::ExportFormat;
+use crate::cli::{ExportFormat, OutputFormat};
+use crate::dto::{ExportDto, SubtitleDto};
+use crate::json_output::{output_error, output_success};
 use crate::utils;
-use lib::subtitle::model::{Subtitle, SubtitleError};
+use lib::subtitle::model::Subtitle;
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
-use log::{debug, error, info};
-use std::path::Path;
+use log::{debug, info};
 
 /// Format subtitles in anchored format: [INDEX] TEXT
 fn format_anchored(subtitles: &[Subtitle]) -> String {
@@ -28,7 +29,12 @@ fn format_anchored(subtitles: &[Subtitle]) -> String {
     output
 }
 
-pub fn handle(file: &str, range: &str, format: ExportFormat) -> anyhow::Result<()> {
+pub fn handle(
+    file: &str,
+    range: &str,
+    export_format: ExportFormat,
+    format: &OutputFormat,
+) -> anyhow::Result<()> {
     info!(
         "exporting subtitles from range {} from file: {}",
         range, file
@@ -37,53 +43,11 @@ pub fn handle(file: &str, range: &str, format: ExportFormat) -> anyhow::Result<(
     let (start, end) = utils::parse_range(range)?;
     debug!("parsed range: start={}, end={}", start, end);
 
-    let file_path = Path::new(file);
-    debug!("parsing file path: {:?}", file_path);
-
-    if file_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("Failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(file_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("Failed to resolve file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("Failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", file_path);
-            return Err(anyhow::anyhow!(
-                "Invalid file path: path traversal not allowed"
-            ));
-        }
-    }
-
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("Failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("Invalid file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("Invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("filename: {}", filename);
-
-    let service = SubRipService::new(base_dir);
+    let resolved = utils::resolve_existing_path(file)?;
+    let service = SubRipService::new(resolved.base_dir);
 
     debug!("retrieving all subtitles for filtering..");
-    match service.get_all(&filename) {
+    match service.get_all(&resolved.filename) {
         Ok(subtitles) => {
             debug!("found {} total subtitles", subtitles.len());
 
@@ -97,24 +61,38 @@ pub fn handle(file: &str, range: &str, format: ExportFormat) -> anyhow::Result<(
                 })
                 .collect();
 
-            debug!(
-                "found {} subtitle(s) in range {}-{}",
-                range_subtitles.len(),
-                start,
-                end
-            );
-
             if range_subtitles.is_empty() {
-                info!("no subtitles found in range {}-{}", start, end);
-                eprintln!("error: No subtitles found in range {}-{}", start, end);
-                std::process::exit(1);
+                output_error(
+                    format,
+                    "no_subtitles_in_range",
+                    &format!("No subtitles found in range {}-{}", start, end),
+                    None,
+                );
+                return Err(anyhow::anyhow!(""));
             }
 
-            let output = match format {
-                ExportFormat::Anchored => format_anchored(&range_subtitles),
+            let format_name = match export_format {
+                ExportFormat::Anchored => "anchored",
             };
 
-            print!("{}", output);
+            let dto = ExportDto {
+                subtitles: range_subtitles
+                    .iter()
+                    .map(SubtitleDto::from_subtitle)
+                    .collect(),
+                format: format_name.to_string(),
+                range_start: start,
+                range_end: end,
+                count: range_subtitles.len(),
+            };
+
+            output_success(format, &dto, || {
+                let output = match export_format {
+                    ExportFormat::Anchored => format_anchored(&range_subtitles),
+                };
+                print!("{}", output);
+            });
+
             info!(
                 "successfully exported {} subtitle(s)",
                 range_subtitles.len()
@@ -122,30 +100,14 @@ pub fn handle(file: &str, range: &str, format: ExportFormat) -> anyhow::Result<(
             Ok(())
         }
         Err(e) => {
-            debug!("error occurred: {:?}", e);
-            match e {
-                SubtitleError::FileNotFound(path) => {
-                    info!("file not found: {}", path);
-                    eprintln!("error: File not found: {}", path);
-                }
-                SubtitleError::InvalidPath(msg) => {
-                    error!("invalid file path: {}", msg);
-                    eprintln!("error: Invalid file path: {}", msg);
-                }
-                SubtitleError::ParseError(err) => {
-                    error!("parse error: {}", err);
-                    eprintln!("error: Failed to parse subtitle file: {}", err);
-                }
-                SubtitleError::IoError(err) => {
-                    error!("i/o error: {}", err);
-                    eprintln!("error: Failed to read file: {}", err);
-                }
-                _ => {
-                    error!("unexpected error: {}", e);
-                    eprintln!("error: {}", e);
-                }
-            }
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, file);
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            Err(anyhow::anyhow!(""))
         }
     }
 }

@@ -20,11 +20,14 @@ Fügen Sie in `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` ein:
 
 Sie übersetzen Untertitel von Englisch nach Russisch mit dem `sm` CLI-Tool.
 
+Verwenden Sie `--output json` bei allen Befehlen für strukturierte Ausgabe.
+Verwenden Sie `sm describe`, um verfügbare Befehle und ihre Parameter zu erkunden.
+
 ### Schritt 1: Status prüfen
 
 touch Resident.Alien.S03E08.rus.srt
 
-sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm translation-status --output json --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Dies zeigt den Fortschritt und schlägt den nächsten Chunk-Bereich vor.
 
@@ -48,13 +51,17 @@ Erstellen Sie die Datei `chunk.txt` mit Übersetzungen im selben Format:
 
 WICHTIG: Behalten Sie ALLE Indizes. Überspringen Sie keine Zeile.
 
-### Schritt 4: Übersetzungen importieren
+### Schritt 4: Vorschau und Import der Übersetzungen
+
+sm import --dry-run --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
+
+Wenn die Vorschau korrekt aussieht:
 
 sm import --force --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
 
 ### Schritt 5: Chunk überprüfen
 
-sm verify --range=1-50 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm verify --output json --range=1-100 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Falls fehlende Indizes gemeldet werden, extrahieren Sie nur diese:
 
@@ -66,16 +73,18 @@ sm export --format=anchored Resident.Alien.S03E08.eng.srt 40-41
 
 Löschen Sie `chunk.txt`.
 
-sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm translation-status --output json --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Fortfahren, bis der Fortschritt 100 % beträgt.
 
 ### Regeln
 
 - Chunk-Größe: 100 Untertitel
+- Immer `--dry-run` vor dem Import verwenden, um Änderungen zu prüfen
 - Nach jedem Import immer verifizieren
 - Alle fehlenden Einträge beheben, bevor der nächste Chunk beginnt
 - Originalbedeutung bewahren, Redewendungen natürlich anpassen
+- `--output json` für maschinenlesbare Ausgabe verwenden
 ```
 
 ###[/AGENTS.md]#######################################################

@@ -536,7 +536,7 @@ fn test_import_csv_file_not_found() {
     assert!(!output.status.success());
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("failed to resolve input file path"));
+    assert!(stderr.contains("failed to resolve file path"));
 }
 
 #[test]

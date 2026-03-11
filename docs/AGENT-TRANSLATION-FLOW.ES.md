@@ -20,11 +20,14 @@ Coloque en `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`:
 
 Está traduciendo subtítulos del inglés al ruso usando la herramienta CLI `sm`.
 
+Use `--output json` en todos los comandos para obtener salida estructurada.
+Use `sm describe` para descubrir los comandos disponibles y sus parámetros.
+
 ### Paso 1: Comprobar estado
 
 touch Resident.Alien.S03E08.rus.srt
 
-sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm translation-status --output json --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Esto muestra el progreso y sugiere el siguiente rango de fragmento.
 
@@ -48,13 +51,17 @@ Cree el archivo `chunk.txt` con las traducciones en el mismo formato:
 
 IMPORTANTE: Mantenga TODOS los índices. No omita ninguna línea.
 
-### Paso 4: Importar traducciones
+### Paso 4: Vista previa e importar traducciones
+
+sm import --dry-run --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
+
+Si la vista previa es correcta:
 
 sm import --force --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
 
 ### Paso 5: Verificar fragmento
 
-sm verify --range=1-50 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm verify --output json --range=1-100 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Si se informan índices faltantes, extráigalos solo esos:
 
@@ -66,16 +73,18 @@ Traduzca los faltantes, añádalos a `chunk.txt` e importe de nuevo.
 
 Elimine `chunk.txt`.
 
-sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm translation-status --output json --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Continúe hasta que el progreso sea del 100 %.
 
 ### Reglas
 
 - Tamaño del fragmento: 100 subtítulos
+- Usar siempre `--dry-run` antes de importar para vista previa
 - Verificar siempre después de importar
 - Corregir todos los faltantes antes de pasar al siguiente fragmento
 - Preservar el significado original, adaptar los modismos de forma natural
+- Usar `--output json` para salida legible por máquinas
 ```
 
 ###[/AGENTS.md]#######################################################

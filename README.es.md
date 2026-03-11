@@ -16,18 +16,25 @@ Submarine está diseñado para ayudar en el proceso de traducción con herramien
 
 - Formato de subtítulos: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
 - Flujos de trabajo compatibles:
-  - Agente: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md)
-  - Chatbot: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md)
+  - Agente: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md), [De](docs/AGENT-TRANSLATION-FLOW.DE.md), [Es](docs/AGENT-TRANSLATION-FLOW.ES.md)
+  - Chatbot: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md), [De](docs/CHATBOT-TRANSLATION-FLOW.DE.md), [Es](docs/CHATBOT-TRANSLATION-FLOW.ES.md)
 - **Herramientas:**
-  - Obtener subtítulo por índice
+  - Obtener subtítulo por índice o rango
   - Añadir un nuevo subtítulo
-  - Importar subtítulos desde archivo
-  - Actualizar subtítulo con desplazamiento
+  - Modificar propiedades de un subtítulo
+  - Importar subtítulos desde archivo (CSV, formato anclado)
+  - Ajustar marcas de tiempo con desplazamiento
   - Renombrado masivo de archivos de subtítulos
   - Exportar subtítulos en formato anclado
+  - Diagnosticar y reparar problemas del archivo (`doctor`)
 - **Verificación:**
   - Verificar subtítulos traducidos contra el original
   - Seguimiento del progreso de traducción
+- **Adaptado para agentes:**
+  - Salida JSON estructurada (`--output json`) en todos los comandos
+  - Vista previa de cambios (`--dry-run`) en todos los comandos que modifican archivos
+  - Introspección del esquema (`sm describe`)
+  - Códigos de error y sugerencias legibles por máquinas
 - **Copias de seguridad automáticas:** crea backups de los archivos de subtítulos antes de realizar cambios.
 
 ## Instalación
@@ -43,9 +50,9 @@ brew install lebe-dev/tap/submarine
 ### Linux
 
 ```bash
-curl -L -o sm-0.13.1-linux-amd64.zip \
-  https://github.com/lebe-dev/submarine/releases/download/0.13.1/sm-0.13.1-linux-amd64.zip
-unzip sm-0.13.1-linux-amd64.zip
+curl -L -o sm-0.14.0-linux-amd64.zip \
+  https://github.com/lebe-dev/submarine/releases/download/0.14.0/sm-0.14.0-linux-amd64.zip
+unzip sm-0.14.0-linux-amd64.zip
 sudo install -m 0755 sm /usr/local/bin/sm
 sm --help
 ```
@@ -77,22 +84,25 @@ First subtitle
 Second subtitle
 
 # Establecer subtítulo para un índice
-# sm set [FILE.srt] [INDEX] \
+# sm set [--dry-run] [FILE.srt] [INDEX] \
 #       [--start=00:00:03,481] \
 #       [--end=00:00:04,481] \
 #       [--text "TEXT"]
 $ sm set Resident.Alien.S01E01.srt 123 \
        --text "Okay"
 
+# Vista previa sin modificar el archivo
+$ sm set --dry-run Resident.Alien.S01E01.srt 123 --text "Okay"
+
 # Añadir subtítulo al final del archivo
 # Incrementa el índice automáticamente y crea un backup
 # Crea el archivo srt si no existe
-# sm add [FILE.srt] [START-END-TIMESTAMP] "[NEW-SUBTITLE]"
+# sm add [--dry-run] [FILE.srt] [START-END-TIMESTAMP] "[NEW-SUBTITLE]"
 $ sm add Resident.Alien.S01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 
 # Ajustar marcas de tiempo con un desplazamiento
 # Admite valores positivos y negativos en milisegundos
-# sm delay [FILE.srt] [OFFSET]
+# sm delay [--dry-run] [FILE.srt] [OFFSET]
 $ sm delay Resident.Alien.S01E01.srt "+1000"  # Añadir 1 segundo
 $ sm delay Resident.Alien.S01E01.srt "-500"   # Restar 0.5 segundos
 
@@ -154,6 +164,16 @@ $ sm export --format=anchored movie.eng.srt 1-50
 [3] Good to hear.
 ...
 [50] See you tomorrow.
+
+# Salida JSON (disponible en todos los comandos excepto compare)
+$ sm get Resident.Alien.S01E01.srt 1 --output json
+{"ok":true,"data":{"index":1,"start_time":"00:00:01,436",...}}
+
+$ sm info Resident.Alien.S01E01.srt --output json
+
+# Descubrir los comandos disponibles y sus esquemas
+$ sm describe
+$ sm describe get
 ```
 
 ## Uso como biblioteca
@@ -162,6 +182,5 @@ Además de la interfaz de línea de comandos, Submarine puede usarse como biblio
 
 ## Hoja de ruta
 
-- Refactorización del código
 - Feature: sincronización
 - Feature: fusión

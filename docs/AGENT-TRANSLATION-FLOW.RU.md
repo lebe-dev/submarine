@@ -20,11 +20,14 @@
 
 Вы переводите субтитры с английского на русский с помощью CLI-инструмента `sm`.
 
+Используйте `--output json` для всех команд для получения структурированного вывода.
+Используйте `sm describe` для просмотра доступных команд и их параметров.
+
 ### Шаг 1: Проверка статуса
 
-touch Resident.Alien.rus.srt
+touch Resident.Alien.S03E08.rus.srt
 
-sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm translation-status --output json --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Эта команда покажет прогресс и предложит следующий диапазон для перевода.
 
@@ -48,13 +51,17 @@ sm export --format=anchored Resident.Alien.S03E08.eng.srt 1-100
 
 ВАЖНО: Сохраните ВСЕ индексы. Не пропускайте ни одной строки.
 
-### Шаг 4: Импорт переводов
+### Шаг 4: Предпросмотр и импорт переводов
+
+sm import --dry-run --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
+
+Если предпросмотр выглядит корректно:
 
 sm import --force --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
 
 ### Шаг 5: Проверка фрагмента
 
-sm verify --range=1-50 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm verify --output json --range=1-100 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Если обнаружены пропущенные индексы, извлеките только их:
 
@@ -66,16 +73,18 @@ sm export --format=anchored Resident.Alien.S03E08.eng.srt 40-41
 
 Удалите `chunk.txt`.
 
-sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm translation-status --output json --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Продолжайте, пока прогресс не достигнет 100%.
 
 ### Правила
 
 - Размер фрагмента: 100 субтитров
+- Всегда используйте `--dry-run` перед импортом для предпросмотра
 - Всегда проверяйте после импорта
 - Исправляйте все пропуски перед переходом к следующему фрагменту
 - Сохраняйте исходный смысл, адаптируйте идиомы естественным образом
+- Используйте `--output json` для машиночитаемого вывода
 ```
 
 ###[/AGENTS.md]#######################################################

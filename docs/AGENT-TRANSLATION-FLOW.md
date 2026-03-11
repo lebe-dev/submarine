@@ -20,11 +20,14 @@ Put in `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`:
 
 You are translating subtitles from English to Russian using the `sm` CLI tool.
 
+Use `--output json` on all commands to get structured output.
+Use `sm describe` to discover available commands and their parameters.
+
 ### Step 1: Check status
 
 touch Resident.Alien.S03E08.rus.srt
 
-sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm translation-status --output json --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 This shows progress and suggests next chunk range.
 
@@ -48,13 +51,17 @@ Create file `chunk.txt` with translations in same format:
 
 IMPORTANT: Keep ALL indices. Do not skip any line.
 
-### Step 4: Import translations
+### Step 4: Preview and import translations
 
-sm import --force --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt 
+sm import --dry-run --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
+
+If preview looks correct:
+
+sm import --force --reference=Resident.Alien.S03E08.eng.srt --format=anchored Resident.Alien.S03E08.rus.srt chunk.txt
 
 ### Step 5: Verify chunk
 
-sm verify --range=1-50 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm verify --output json --range=1-100 Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 If missing indices reported, extract only those:
 
@@ -66,16 +73,18 @@ Translate missing, append to `chunk.txt`, import again.
 
 Remove `chunk.txt`.
 
-sm translation-status --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
+sm translation-status --output json --reference=Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
 
 Continue until progress is 100%.
 
 ### Rules
 
 - Chunk size: 100 subtitles
+- Always use `--dry-run` before importing to preview changes
 - Always verify after import
 - Fix all missing before moving to next chunk
 - Preserve original meaning, adapt idioms naturally
+- Use `--output json` for machine-parseable output
 ```
 
 ###[/AGENTS.md]#######################################################

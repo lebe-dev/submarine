@@ -1,42 +1,23 @@
+use crate::cli::OutputFormat;
+use crate::dto::{DiagnosticDto, FixDto, IssueDto};
+use crate::json_output::{output_error, output_success};
+use crate::utils;
 use lib::backup::ports::BackupService;
 use lib::backup::service::SubRipBackupService;
-use lib::doctor::model::DoctorError;
+use lib::doctor::model::Severity;
 use lib::doctor::ports::DoctorService;
 use lib::doctor::service::SubRipDoctorService;
 use log::{debug, error, info};
-use std::path::Path;
 
-pub fn handle(file: &str, fix: bool) -> anyhow::Result<()> {
-    info!("запуск doctor для файла: {}", file);
+pub fn handle(file: &str, fix: bool, format: &OutputFormat) -> anyhow::Result<()> {
+    info!("running doctor for file: {}", file);
 
-    let file_path = Path::new(file);
-    debug!("parsing file path: {:?}", file_path);
-
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("Failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("Invalid file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("Invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("filename: {}", filename);
-
-    let service = SubRipDoctorService::new(base_dir);
+    let resolved = utils::resolve_existing_path(file)?;
+    let service = SubRipDoctorService::new(resolved.base_dir);
 
     if fix {
-        // Fix mode - create backup before fixing
         let backup_service = SubRipBackupService::new();
-        let backup_result = backup_service.create_backup(&canonical_path);
+        let backup_result = backup_service.create_backup(&resolved.full_path);
 
         let backup_path = match backup_result {
             Ok(Some(path)) => {
@@ -45,45 +26,117 @@ pub fn handle(file: &str, fix: bool) -> anyhow::Result<()> {
             }
             Ok(None) => {
                 error!("file does not exist, cannot fix");
-                eprintln!("error: File does not exist: {}", file);
-                std::process::exit(1);
+                output_error(
+                    format,
+                    "file_not_found",
+                    &format!("File does not exist: {}", file),
+                    None,
+                );
+                return Err(anyhow::anyhow!(""));
             }
             Err(e) => {
                 error!("failed to create backup: {}", e);
-                eprintln!("error: Failed to create backup: {}", e);
-                std::process::exit(1);
+                output_error(
+                    format,
+                    "backup_failed",
+                    &format!("Failed to create backup: {}", e),
+                    None,
+                );
+                return Err(anyhow::anyhow!(""));
             }
         };
 
-        match service.fix(&filename) {
+        match service.fix(&resolved.filename) {
             Ok(report) => {
-                info!("исправление завершено успешно");
-                print_fix_report(&report, &backup_path);
+                info!("fix completed successfully");
+
+                let dto = FixDto {
+                    original_path: report.original_path.clone(),
+                    backup_path: backup_path.clone(),
+                    issues_fixed: report.issues_fixed,
+                    issues_unfixable: report.issues_unfixable,
+                    validation_success: report.validation_success,
+                    unfixable_issues: report
+                        .unfixable_issues
+                        .iter()
+                        .map(|i| IssueDto {
+                            line_number: i.line_number,
+                            block_number: i.block_number,
+                            severity: match i.severity {
+                                Severity::Error => "error".into(),
+                                Severity::Warning => "warning".into(),
+                            },
+                            description: format!("{}", i.issue_type),
+                        })
+                        .collect(),
+                };
+
+                output_success(format, &dto, || {
+                    print_fix_report(&report, &backup_path);
+                });
+
                 Ok(())
             }
             Err(e) => {
-                error!("исправление не удалось: {}", e);
-                handle_error(e);
-                std::process::exit(1);
+                error!("fix failed: {}", e);
+                let cli_err = utils::format_doctor_error(&e);
+                output_error(
+                    format,
+                    &cli_err.code,
+                    &cli_err.message,
+                    cli_err.hint.as_deref(),
+                );
+                Err(anyhow::anyhow!(""))
             }
         }
     } else {
-        // Diagnostic mode
-        match service.diagnose(&filename) {
+        match service.diagnose(&resolved.filename) {
             Ok(report) => {
-                info!("диагностика завершена");
-                print_diagnostic_report(&report);
+                info!("diagnosis completed");
+
+                let dto = DiagnosticDto {
+                    file_path: report.file_path.clone(),
+                    total_lines: report.total_lines,
+                    total_blocks: report.total_blocks,
+                    is_parsable: report.is_parsable,
+                    error_count: report.error_count(),
+                    warning_count: report.warning_count(),
+                    has_issues: report.has_issues(),
+                    issues: report
+                        .issues
+                        .iter()
+                        .map(|i| IssueDto {
+                            line_number: i.line_number,
+                            block_number: i.block_number,
+                            severity: match i.severity {
+                                Severity::Error => "error".into(),
+                                Severity::Warning => "warning".into(),
+                            },
+                            description: format!("{}", i.issue_type),
+                        })
+                        .collect(),
+                };
+
+                output_success(format, &dto, || {
+                    print_diagnostic_report(&report);
+                });
 
                 if report.has_errors() {
-                    std::process::exit(1);
-                } else {
-                    Ok(())
+                    return Err(anyhow::anyhow!(""));
                 }
+
+                Ok(())
             }
             Err(e) => {
-                error!("диагностика не удалась: {}", e);
-                handle_error(e);
-                std::process::exit(1);
+                error!("diagnosis failed: {}", e);
+                let cli_err = utils::format_doctor_error(&e);
+                output_error(
+                    format,
+                    &cli_err.code,
+                    &cli_err.message,
+                    cli_err.hint.as_deref(),
+                );
+                Err(anyhow::anyhow!(""))
             }
         }
     }
@@ -114,14 +167,14 @@ fn print_diagnostic_report(report: &lib::doctor::model::DiagnosticReport) {
 
         if error_count > 0 {
             println!(
-                "  ❌ {} error{} found",
+                "  {} error{} found",
                 error_count,
                 if error_count == 1 { "" } else { "s" }
             );
         }
         if warning_count > 0 {
             println!(
-                "  ⚠️  {} warning{} found",
+                "  {} warning{} found",
                 warning_count,
                 if warning_count == 1 { "" } else { "s" }
             );
@@ -136,7 +189,7 @@ fn print_diagnostic_report(report: &lib::doctor::model::DiagnosticReport) {
         println!();
         println!("Run with --fix to automatically repair these issues.");
     } else {
-        println!("✓ No issues found");
+        println!("No issues found");
         println!("  File is valid");
     }
 }
@@ -145,11 +198,11 @@ fn print_fix_report(report: &lib::doctor::model::FixReport, backup_path: &str) {
     println!("Fixing: {}", report.original_path);
     println!();
 
-    println!("✓ Backup: {}", backup_path);
+    println!("Backup: {}", backup_path);
 
     if report.issues_fixed > 0 {
         println!(
-            "✓ Fixed {} issue{}",
+            "Fixed {} issue{}",
             report.issues_fixed,
             if report.issues_fixed == 1 { "" } else { "s" }
         );
@@ -157,7 +210,7 @@ fn print_fix_report(report: &lib::doctor::model::FixReport, backup_path: &str) {
 
     if report.issues_unfixable > 0 {
         println!(
-            "✗ {} issue{} could not be fixed:",
+            "{} issue{} could not be fixed:",
             report.issues_unfixable,
             if report.issues_unfixable == 1 {
                 ""
@@ -171,20 +224,20 @@ fn print_fix_report(report: &lib::doctor::model::FixReport, backup_path: &str) {
     }
 
     if report.validation_success {
-        println!("✓ Validation successful: file can now be parsed");
+        println!("Validation successful: file can now be parsed");
     } else {
-        println!("⚠️  Validation failed: file still contains errors");
+        println!("Validation failed: file still contains errors");
     }
 
     println!();
     println!("Summary:");
     println!(
-        "  ✓ {} issue{} fixed",
+        "  {} issue{} fixed",
         report.issues_fixed,
         if report.issues_fixed == 1 { "" } else { "s" }
     );
     println!(
-        "  ✗ {} issue{} unfixable",
+        "  {} issue{} unfixable",
         report.issues_unfixable,
         if report.issues_unfixable == 1 {
             ""
@@ -194,28 +247,8 @@ fn print_fix_report(report: &lib::doctor::model::FixReport, backup_path: &str) {
     );
 
     if report.validation_success {
-        println!("  ✓ File is now valid");
+        println!("  File is now valid");
     } else {
-        println!("  ✗ File still has errors");
-    }
-}
-
-fn handle_error(e: DoctorError) {
-    match e {
-        DoctorError::FileNotFound(path) => {
-            eprintln!("error: File not found: {}", path);
-        }
-        DoctorError::InvalidPath(msg) => {
-            eprintln!("error: Invalid file path: {}", msg);
-        }
-        DoctorError::IoError(err) => {
-            eprintln!("error: I/O error: {}", err);
-        }
-        DoctorError::BackupFailed(msg) => {
-            eprintln!("error: Backup creation failed: {}", msg);
-        }
-        DoctorError::ValidationFailed(msg) => {
-            eprintln!("error: Validation failed: {}", msg);
-        }
+        println!("  File still has errors");
     }
 }

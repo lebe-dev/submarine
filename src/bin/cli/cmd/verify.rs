@@ -1,22 +1,24 @@
+use crate::cli::OutputFormat;
+use crate::dto::VerifyDto;
+use crate::json_output::{output_error, output_success};
 use crate::utils;
-use lib::subtitle::model::{Subtitle, SubtitleError};
+use lib::subtitle::model::Subtitle;
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
 use lib::verify::model::{ComparisonStatus, VerificationReport};
 use lib::verify::service;
-use log::{debug, error, info};
-use std::path::Path;
+use log::{debug, info};
 
-/// Entry point for the verify command
-///
-/// Loads two SRT files and compares them for index and timestamp discrepancies.
-/// The first file is treated as the reference (authoritative).
-/// Optionally accepts a range parameter to verify only subtitles within that range.
-pub fn handle(file1: &str, file2: &str, range: Option<&str>) -> anyhow::Result<()> {
+pub fn handle(
+    file1: &str,
+    file2: &str,
+    range: Option<&str>,
+    format: &OutputFormat,
+) -> anyhow::Result<()> {
     info!("verifying files: {} and {}", file1, file2);
 
-    let (mut ref_subs, ref_filename) = load_subtitle_file(file1)?;
-    let (mut target_subs, target_filename) = load_subtitle_file(file2)?;
+    let (mut ref_subs, ref_filename) = load_subtitle_file(file1, format)?;
+    let (mut target_subs, target_filename) = load_subtitle_file(file2, format)?;
 
     debug!(
         "loaded {} and {} subtitles",
@@ -39,30 +41,49 @@ pub fn handle(file1: &str, file2: &str, range: Option<&str>) -> anyhow::Result<(
             index >= start && index <= end
         });
 
-        debug!(
-            "after filtering: {} ref subtitles, {} target subtitles",
-            ref_subs.len(),
-            target_subs.len()
-        );
-
         Some((start, end))
     } else {
         None
     };
 
     if ref_subs.is_empty() {
-        eprintln!("error: reference file is empty");
-        std::process::exit(1);
+        output_error(format, "empty_file", "reference file is empty", None);
+        return Err(anyhow::anyhow!(""));
     }
 
     if target_subs.is_empty() {
-        eprintln!("error: target file is empty");
-        std::process::exit(1);
+        output_error(format, "empty_file", "target file is empty", None);
+        return Err(anyhow::anyhow!(""));
     }
 
     let report = service::compare_subtitles(ref_subs, ref_filename, target_subs, target_filename);
 
-    display_verification_report(&report, range_info);
+    let status = if report.is_perfect() {
+        "success"
+    } else if !report.extra_in_target.is_empty() && !report.has_issues() {
+        "warning"
+    } else {
+        "failed"
+    };
+
+    let dto = VerifyDto {
+        ref_file: report.ref_file.clone(),
+        target_file: report.target_file.clone(),
+        total_ref_count: report.total_ref_count,
+        total_target_count: report.total_target_count,
+        perfect_matches: report.perfect_matches,
+        total_matched: report.total_matched(),
+        match_percentage: report.match_percentage(),
+        timestamp_mismatches: report.timestamp_mismatches.len(),
+        missing_in_target: report.missing_in_target.len(),
+        extra_in_target: report.extra_in_target.len(),
+        detected_offset: report.detected_offset,
+        status: status.to_string(),
+    };
+
+    output_success(format, &dto, || {
+        display_verification_report(&report, range_info);
+    });
 
     info!(
         "verification completed: {:.1}% match",
@@ -70,106 +91,43 @@ pub fn handle(file1: &str, file2: &str, range: Option<&str>) -> anyhow::Result<(
     );
 
     if report.has_issues() || !report.is_perfect() {
-        std::process::exit(1);
+        return Err(anyhow::anyhow!(""));
     }
 
     Ok(())
 }
 
-/// Load and validate a subtitle file
-///
-/// Performs path canonicalization with traversal protection,
-/// loads subtitles using SubRipService, and returns the subtitles
-/// along with the filename for display.
-fn load_subtitle_file(file: &str) -> anyhow::Result<(Vec<Subtitle>, String)> {
+fn load_subtitle_file(
+    file: &str,
+    format: &OutputFormat,
+) -> anyhow::Result<(Vec<Subtitle>, String)> {
     debug!("loading subtitle file: {}", file);
 
-    let file_path = Path::new(file);
-    debug!("parsing file path: {:?}", file_path);
+    let resolved = utils::resolve_existing_path(file)?;
+    let service = SubRipService::new(resolved.base_dir);
 
-    if file_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(file_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", file_path);
-            return Err(anyhow::anyhow!(
-                "invalid file path: path traversal not allowed"
-            ));
-        }
-    }
-
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("invalid file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("invalid file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("filename: {}", filename);
-
-    let service = SubRipService::new(base_dir);
-    debug!("loading subtitles from file: {}", filename);
-
-    match service.get_all(&filename) {
+    match service.get_all(&resolved.filename) {
         Ok(subtitles) => {
             info!(
                 "successfully loaded {} subtitle(s) from {}",
                 subtitles.len(),
-                filename
+                resolved.filename
             );
-            Ok((subtitles, filename))
+            Ok((subtitles, resolved.filename))
         }
         Err(e) => {
-            debug!("error occurred: {:?}", e);
-            match e {
-                SubtitleError::FileNotFound(path) => {
-                    error!("file not found: {}", path);
-                    eprintln!("error: file not found: {}", path);
-                }
-                SubtitleError::InvalidPath(msg) => {
-                    error!("invalid file path: {}", msg);
-                    eprintln!("error: invalid file path: {}", msg);
-                }
-                SubtitleError::ParseError(err) => {
-                    error!("parse error: {}", err);
-                    eprintln!("error: failed to parse subtitle file: {}", err);
-                    eprintln!("hint: try running 'sm doctor --fix {}' first", filename);
-                }
-                SubtitleError::IoError(err) => {
-                    error!("i/o error: {}", err);
-                    eprintln!("error: failed to read file: {}", err);
-                }
-                _ => {
-                    error!("unexpected error: {}", e);
-                    eprintln!("error: {}", e);
-                }
-            }
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, file);
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            Err(anyhow::anyhow!(""))
         }
     }
 }
 
-/// Display the verification report to the user
 fn display_verification_report(report: &VerificationReport, range_info: Option<(u32, u32)>) {
     println!();
     if let Some((start, end)) = range_info {
@@ -201,7 +159,6 @@ fn display_verification_report(report: &VerificationReport, range_info: Option<(
         match_pct
     );
 
-    // Display timestamp mismatches
     if !report.timestamp_mismatches.is_empty() {
         println!(
             "Timestamp mismatches: {}",
@@ -209,7 +166,6 @@ fn display_verification_report(report: &VerificationReport, range_info: Option<(
         );
     }
 
-    // Display missing subtitles
     if !report.missing_in_target.is_empty() {
         println!(
             "Missing in {}: {}",
@@ -218,12 +174,10 @@ fn display_verification_report(report: &VerificationReport, range_info: Option<(
         );
     }
 
-    // Display detected offset
     if let Some(offset) = report.detected_offset {
         println!("Index offset detected: {}", offset);
     }
 
-    // Display extra subtitles
     if !report.extra_in_target.is_empty() {
         println!(
             "Extra in {}: {}",
@@ -234,7 +188,6 @@ fn display_verification_report(report: &VerificationReport, range_info: Option<(
 
     println!();
 
-    // Display detailed timestamp mismatches (limited to first 10)
     if !report.timestamp_mismatches.is_empty() {
         println!("Timestamp mismatches:");
         let limit = 10.min(report.timestamp_mismatches.len());
@@ -259,7 +212,6 @@ fn display_verification_report(report: &VerificationReport, range_info: Option<(
         println!();
     }
 
-    // Display detailed missing subtitles (limited to first 10)
     if !report.missing_in_target.is_empty() {
         println!("Missing subtitles:");
         let limit = 10.min(report.missing_in_target.len());
@@ -279,7 +231,6 @@ fn display_verification_report(report: &VerificationReport, range_info: Option<(
         println!();
     }
 
-    // Display detailed extra subtitles (limited to first 10)
     if !report.extra_in_target.is_empty() {
         println!("Extra subtitles in {}:", report.target_file);
         let limit = 10.min(report.extra_in_target.len());
@@ -297,7 +248,6 @@ fn display_verification_report(report: &VerificationReport, range_info: Option<(
         println!();
     }
 
-    // Display verification status
     if report.is_perfect() {
         println!("Verification: SUCCESS");
     } else if !report.extra_in_target.is_empty() && !report.has_issues() {

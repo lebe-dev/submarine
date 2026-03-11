@@ -1,4 +1,7 @@
-use crate::cli::ImportFormat;
+use crate::cli::{ImportFormat, OutputFormat};
+use crate::dto::ImportResultDto;
+use crate::json_output::{output_error, output_success};
+use crate::utils;
 use lib::backup::ports::BackupService;
 use lib::backup::service::SubRipBackupService;
 use lib::import::model::CsvSubtitleRow;
@@ -49,124 +52,63 @@ fn confirm_import(count: usize) -> anyhow::Result<bool> {
     Ok(input.trim().eq_ignore_ascii_case("y"))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn handle(
     srt_file: &str,
     input_file: &str,
-    format: ImportFormat,
+    import_format: ImportFormat,
     reference: Option<&str>,
     delimiter: &str,
     dry_run: bool,
     force: bool,
+    format: &OutputFormat,
 ) -> anyhow::Result<()> {
     info!("importing subtitles from {} to {}", input_file, srt_file);
 
-    match format {
+    match import_format {
         ImportFormat::Anchored => {
             if reference.is_none() {
-                error!("anchored format requires --reference parameter");
-                eprintln!("error: Anchored format requires --reference FILE parameter");
-                eprintln!("hint: Use --reference to specify the SRT file containing timestamps");
-                std::process::exit(1);
+                output_error(
+                    format,
+                    "missing_reference",
+                    "Anchored format requires --reference FILE parameter",
+                    Some("Use --reference to specify the SRT file containing timestamps"),
+                );
+                return Err(anyhow::anyhow!(""));
             }
         }
         ImportFormat::Csv => {
             if delimiter.len() != 1 {
-                error!("invalid delimiter: must be a single character");
-                eprintln!(
-                    "error: Delimiter must be a single character, got: '{}'",
-                    delimiter
+                output_error(
+                    format,
+                    "invalid_delimiter",
+                    &format!("Delimiter must be a single character, got: '{}'", delimiter),
+                    None,
                 );
-                std::process::exit(1);
+                return Err(anyhow::anyhow!(""));
             }
         }
     }
 
-    let delimiter_char = if matches!(format, ImportFormat::Csv) {
+    let delimiter_char = if matches!(import_format, ImportFormat::Csv) {
         delimiter.chars().next().unwrap()
     } else {
-        '|' // Default, won't be used for anchored
+        '|'
     };
-    if matches!(format, ImportFormat::Csv) {
-        debug!("using delimiter: '{}'", delimiter_char);
-    }
 
-    let srt_path = Path::new(srt_file);
-    debug!("parsing srt file path: {:?}", srt_path);
+    let srt_resolved = utils::resolve_existing_path(srt_file)?;
+    let input_resolved = utils::resolve_existing_path(input_file)?;
 
-    if srt_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(srt_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve srt file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", srt_path);
-            return Err(anyhow::anyhow!(
-                "invalid srt file path: path traversal not allowed"
-            ));
-        }
-    }
-
-    let canonical_srt_path = srt_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("failed to resolve srt file path: {}", e))?;
-    debug!("canonical srt path: {:?}", canonical_srt_path);
-
-    let base_dir = canonical_srt_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("invalid srt file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_srt_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("invalid srt file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("srt filename: {}", filename);
-
-    let input_path = Path::new(input_file);
-    debug!("parsing input file path: {:?}", input_path);
-
-    if input_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(input_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve input file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", input_path);
-            return Err(anyhow::anyhow!(
-                "invalid input file path: path traversal not allowed"
-            ));
-        }
-    }
-
-    let canonical_input_path = input_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("failed to resolve input file path: {}", e))?;
-    debug!("canonical input path: {:?}", canonical_input_path);
-
-    let subtitles = match format {
-        ImportFormat::Csv => handle_csv_import(&canonical_input_path, delimiter_char)?,
+    let subtitles = match import_format {
+        ImportFormat::Csv => handle_csv_import(&input_resolved.full_path, delimiter_char, format)?,
         ImportFormat::Anchored => {
-            let reference_path = reference.unwrap(); // Safe: validated above
-            handle_anchored_import(&canonical_input_path, reference_path, &base_dir)?
+            let reference_path = reference.unwrap();
+            handle_anchored_import(
+                &input_resolved.full_path,
+                reference_path,
+                &srt_resolved.base_dir,
+                format,
+            )?
         }
     };
 
@@ -174,7 +116,30 @@ pub fn handle(
 
     if dry_run {
         info!("dry-run mode, operations not executed");
-        println!("Dry-run mode: no subtitles were imported");
+
+        let min_idx = subtitles
+            .iter()
+            .map(|s| *s.index.as_ref())
+            .min()
+            .unwrap_or(0);
+        let max_idx = subtitles
+            .iter()
+            .map(|s| *s.index.as_ref())
+            .max()
+            .unwrap_or(0);
+
+        let dto = ImportResultDto {
+            imported_count: subtitles.len(),
+            start_index: min_idx,
+            end_index: max_idx,
+            total_subtitles: 0, // Unknown in dry-run
+            backup_path: "N/A (dry-run)".into(),
+            dry_run: true,
+        };
+
+        output_success(format, &dto, || {
+            println!("Dry-run mode: no subtitles were imported");
+        });
         return Ok(());
     }
 
@@ -188,7 +153,7 @@ pub fn handle(
     }
 
     let backup_service = SubRipBackupService::new();
-    let backup_result = backup_service.create_backup(&canonical_srt_path);
+    let backup_result = backup_service.create_backup(&srt_resolved.full_path);
 
     let backup_path = match backup_result {
         Ok(Some(path)) => {
@@ -201,14 +166,19 @@ pub fn handle(
         }
         Err(e) => {
             error!("failed to create backup: {}", e);
-            eprintln!("error: Failed to create backup: {}", e);
-            std::process::exit(1);
+            output_error(
+                format,
+                "backup_failed",
+                &format!("Failed to create backup: {}", e),
+                None,
+            );
+            return Err(anyhow::anyhow!(""));
         }
     };
 
-    let service = SubRipService::new(base_dir);
+    let service = SubRipService::new(srt_resolved.base_dir);
 
-    let (imported_count, start_index, end_index, total_subtitles) = match format {
+    let (imported_count, start_index, end_index, total_subtitles) = match import_format {
         ImportFormat::Csv => {
             debug!("adding {} subtitles...", subtitles.len());
             let mut added_count = 0;
@@ -217,7 +187,7 @@ pub fn handle(
 
             for subtitle in subtitles {
                 match service.add(
-                    &filename,
+                    &srt_resolved.filename,
                     subtitle.start_time,
                     subtitle.end_time,
                     subtitle.text,
@@ -228,20 +198,21 @@ pub fn handle(
                         }
                         end_idx = Some(report.new_index);
                         added_count += 1;
-                        debug!(
-                            "added subtitle {} (index {})",
-                            added_count, report.new_index
-                        );
                     }
                     Err(e) => {
-                        error!("failed to add subtitle: {:?}", e);
-                        handle_subtitle_error(e);
-                        std::process::exit(1);
+                        let cli_err = utils::format_subtitle_error(&e, srt_file);
+                        output_error(
+                            format,
+                            &cli_err.code,
+                            &cli_err.message,
+                            cli_err.hint.as_deref(),
+                        );
+                        return Err(anyhow::anyhow!(""));
                     }
                 }
             }
 
-            let total = match service.get_all(&filename) {
+            let total = match service.get_all(&srt_resolved.filename) {
                 Ok(subs) => subs.len(),
                 Err(_) => added_count,
             };
@@ -254,24 +225,18 @@ pub fn handle(
             )
         }
         ImportFormat::Anchored => {
-            debug!(
-                "merging {} subtitles with existing file...",
-                subtitles.len()
-            );
-
-            let existing_subs = match service.get_all(&filename) {
-                Ok(subs) => {
-                    debug!("loaded {} existing subtitles", subs.len());
-                    subs
-                }
-                Err(SubtitleError::FileNotFound(_)) => {
-                    debug!("file does not exist, creating new file");
-                    Vec::new()
-                }
+            let existing_subs = match service.get_all(&srt_resolved.filename) {
+                Ok(subs) => subs,
+                Err(SubtitleError::FileNotFound(_)) => Vec::new(),
                 Err(e) => {
-                    error!("failed to load existing file: {:?}", e);
-                    handle_subtitle_error(e);
-                    std::process::exit(1);
+                    let cli_err = utils::format_subtitle_error(&e, srt_file);
+                    output_error(
+                        format,
+                        &cli_err.code,
+                        &cli_err.message,
+                        cli_err.hint.as_deref(),
+                    );
+                    return Err(anyhow::anyhow!(""));
                 }
             };
 
@@ -288,16 +253,17 @@ pub fn handle(
             let mut merged_subs: Vec<Subtitle> = merged_map.into_values().collect();
             merged_subs.sort_by_key(|s| *s.index.as_ref());
 
-            debug!("writing {} total subtitles to file...", merged_subs.len());
-
-            match service.write_all(&filename, &merged_subs) {
-                Ok(_) => {
-                    debug!("wrote {} subtitles to file", merged_subs.len());
-                }
+            match service.write_all(&srt_resolved.filename, &merged_subs) {
+                Ok(_) => {}
                 Err(e) => {
-                    error!("failed to write updated file: {:?}", e);
-                    handle_subtitle_error(e);
-                    std::process::exit(1);
+                    let cli_err = utils::format_subtitle_error(&e, srt_file);
+                    output_error(
+                        format,
+                        &cli_err.code,
+                        &cli_err.message,
+                        cli_err.hint.as_deref(),
+                    );
+                    return Err(anyhow::anyhow!(""));
                 }
             }
 
@@ -321,17 +287,32 @@ pub fn handle(
         imported_count, start_index, end_index
     );
 
-    println!("✓ Subtitles imported successfully");
-    println!();
-    println!("Imported: {} subtitles", imported_count);
-    println!("Index range: {}-{}", start_index, end_index);
-    println!("Total subtitles: {}", total_subtitles);
-    println!("Backup: {}", backup_path);
+    let dto = ImportResultDto {
+        imported_count,
+        start_index,
+        end_index,
+        total_subtitles,
+        backup_path: backup_path.clone(),
+        dry_run: false,
+    };
+
+    output_success(format, &dto, || {
+        println!("✓ Subtitles imported successfully");
+        println!();
+        println!("Imported: {} subtitles", imported_count);
+        println!("Index range: {}-{}", start_index, end_index);
+        println!("Total subtitles: {}", total_subtitles);
+        println!("Backup: {}", backup_path);
+    });
 
     Ok(())
 }
 
-fn handle_csv_import(csv_path: &Path, delimiter: char) -> anyhow::Result<Vec<Subtitle>> {
+fn handle_csv_import(
+    csv_path: &Path,
+    delimiter: char,
+    format: &OutputFormat,
+) -> anyhow::Result<Vec<Subtitle>> {
     debug!("parsing csv file");
     let import_service = CsvImportService::new();
     let csv_rows = match import_service.parse_csv_file(csv_path, delimiter) {
@@ -340,19 +321,22 @@ fn handle_csv_import(csv_path: &Path, delimiter: char) -> anyhow::Result<Vec<Sub
             rows
         }
         Err(e) => {
-            debug!("csv parsing error: {:?}", e);
-            handle_subtitle_error(e);
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, &csv_path.display().to_string());
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            return Err(anyhow::anyhow!(""));
         }
     };
 
     if csv_rows.is_empty() {
-        error!("csv file is empty (no data rows)");
-        eprintln!("error: CSV file contains no data rows");
-        std::process::exit(1);
+        output_error(format, "empty_csv", "CSV file contains no data rows", None);
+        return Err(anyhow::anyhow!(""));
     }
 
-    debug!("validating and converting {} csv rows...", csv_rows.len());
     convert_csv_to_subtitles(csv_rows)
 }
 
@@ -360,101 +344,59 @@ fn convert_csv_to_subtitles(csv_rows: Vec<CsvSubtitleRow>) -> anyhow::Result<Vec
     let mut subtitles = Vec::new();
 
     for csv_row in csv_rows {
-        let start_duration = match Subtitle::parse_timestamp(&csv_row.start_time) {
-            Ok(d) => d,
-            Err(e) => {
-                error!(
-                    "failed to parse start timestamp at line {}: {}",
-                    csv_row.line_number, e
-                );
-                eprintln!(
-                    "error: Invalid start timestamp at CSV line {}: {}",
-                    csv_row.line_number, e
-                );
-                std::process::exit(1);
-            }
-        };
+        let start_duration = Subtitle::parse_timestamp(&csv_row.start_time).map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid start timestamp at CSV line {}: {}",
+                csv_row.line_number,
+                e
+            )
+        })?;
 
-        let end_duration = match Subtitle::parse_timestamp(&csv_row.end_time) {
-            Ok(d) => d,
-            Err(e) => {
-                error!(
-                    "failed to parse end timestamp at line {}: {}",
-                    csv_row.line_number, e
-                );
-                eprintln!(
-                    "error: Invalid end timestamp at CSV line {}: {}",
-                    csv_row.line_number, e
-                );
-                std::process::exit(1);
-            }
-        };
+        let end_duration = Subtitle::parse_timestamp(&csv_row.end_time).map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid end timestamp at CSV line {}: {}",
+                csv_row.line_number,
+                e
+            )
+        })?;
 
-        let start_time = match SubtitleTimestamp::try_new(start_duration) {
-            Ok(t) => t,
-            Err(e) => {
-                error!(
-                    "invalid start timestamp at line {}: {}",
-                    csv_row.line_number, e
-                );
-                eprintln!(
-                    "error: Invalid start timestamp at CSV line {}: {}",
-                    csv_row.line_number, e
-                );
-                std::process::exit(1);
-            }
-        };
+        let start_time = SubtitleTimestamp::try_new(start_duration).map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid start timestamp at CSV line {}: {}",
+                csv_row.line_number,
+                e
+            )
+        })?;
 
-        let end_time = match SubtitleTimestamp::try_new(end_duration) {
-            Ok(t) => t,
-            Err(e) => {
-                error!(
-                    "invalid end timestamp at line {}: {}",
-                    csv_row.line_number, e
-                );
-                eprintln!(
-                    "error: Invalid end timestamp at CSV line {}: {}",
-                    csv_row.line_number, e
-                );
-                std::process::exit(1);
-            }
-        };
+        let end_time = SubtitleTimestamp::try_new(end_duration).map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid end timestamp at CSV line {}: {}",
+                csv_row.line_number,
+                e
+            )
+        })?;
 
-        let text = match SubtitleText::try_new(csv_row.text.clone()) {
-            Ok(t) => t,
-            Err(e) => {
-                error!("invalid text at line {}: {}", csv_row.line_number, e);
-                eprintln!(
-                    "error: Invalid text (empty or whitespace) at CSV line {}: {}",
-                    csv_row.line_number, e
-                );
-                std::process::exit(1);
-            }
-        };
+        let text = SubtitleText::try_new(csv_row.text.clone()).map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid text (empty or whitespace) at CSV line {}: {}",
+                csv_row.line_number,
+                e
+            )
+        })?;
 
         let temp_index = lib::subtitle::model::SubtitleIndex::try_new((subtitles.len() + 1) as u32)
             .expect("valid subtitle index");
-        let subtitle = match Subtitle::new(temp_index, start_time, end_time, text) {
-            Ok(s) => s,
-            Err(e) => {
-                error!("invalid subtitle at line {}: {}", csv_row.line_number, e);
-                eprintln!(
-                    "error: Invalid subtitle at CSV line {}: {}",
-                    csv_row.line_number, e
-                );
-                std::process::exit(1);
-            }
-        };
+        let subtitle = Subtitle::new(temp_index, start_time, end_time, text).map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid subtitle at CSV line {}: {}",
+                csv_row.line_number,
+                e
+            )
+        })?;
 
         subtitles.push(subtitle);
-        debug!(
-            "validated subtitle {} from CSV line {}",
-            subtitles.len(),
-            csv_row.line_number
-        );
     }
 
-    debug!("validated {} subtitles successfully", subtitles.len());
     Ok(subtitles)
 }
 
@@ -462,6 +404,7 @@ fn handle_anchored_import(
     anchored_path: &Path,
     reference_file: &str,
     _base_dir: &Path,
+    format: &OutputFormat,
 ) -> anyhow::Result<Vec<Subtitle>> {
     debug!("parsing anchored format file");
 
@@ -472,49 +415,35 @@ fn handle_anchored_import(
             rows
         }
         Err(e) => {
-            debug!("anchored parsing error: {:?}", e);
-            handle_subtitle_error(e);
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, &anchored_path.display().to_string());
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            return Err(anyhow::anyhow!(""));
         }
     };
 
     debug!("loading reference file: {}", reference_file);
-    let ref_path = Path::new(reference_file);
+    let ref_resolved = utils::resolve_existing_path(reference_file)?;
+    let service = SubRipService::new(ref_resolved.base_dir);
 
-    let canonical_ref_path = if ref_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
-        let resolved = current_dir.join(ref_path);
-        resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve reference file path: {}", e))?
-    } else {
-        ref_path
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve reference file path: {}", e))?
-    };
-
-    let ref_base_dir = canonical_ref_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("invalid reference file path"))?
-        .to_path_buf();
-
-    let ref_filename = canonical_ref_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("invalid reference file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("invalid UTF-8 in filename"))?;
-
-    let service = SubRipService::new(ref_base_dir);
-    let reference_subtitles = match service.get_all(ref_filename) {
+    let reference_subtitles = match service.get_all(&ref_resolved.filename) {
         Ok(subs) => {
             info!("loaded {} subtitles from reference file", subs.len());
             subs
         }
         Err(e) => {
-            error!("failed to load reference file: {:?}", e);
-            eprintln!("error: Failed to load reference file: {}", e);
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, reference_file);
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            return Err(anyhow::anyhow!(""));
         }
     };
 
@@ -530,138 +459,42 @@ fn handle_anchored_import(
 
         match ref_map.get(&index) {
             Some(ref_subtitle) => {
-                let new_text = match SubtitleText::try_new(anchored_row.text.clone()) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        error!("invalid text at line {}: {}", anchored_row.line_number, e);
-                        eprintln!(
-                            "error: Invalid text (empty or whitespace) at line {}: {}",
-                            anchored_row.line_number, e
-                        );
-                        std::process::exit(1);
-                    }
-                };
+                let new_text = SubtitleText::try_new(anchored_row.text.clone()).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Invalid text (empty or whitespace) at line {}: {}",
+                        anchored_row.line_number,
+                        e
+                    )
+                })?;
 
-                match Subtitle::new(
+                let subtitle = Subtitle::new(
                     ref_subtitle.index,
                     ref_subtitle.start_time,
                     ref_subtitle.end_time,
                     new_text,
-                ) {
-                    Ok(subtitle) => {
-                        updated_subtitles.push(subtitle);
-                        debug!(
-                            "matched index {} from line {}",
-                            index, anchored_row.line_number
-                        );
-                    }
-                    Err(e) => {
-                        error!("failed to create subtitle for index {}: {}", index, e);
-                        eprintln!(
-                            "error: Failed to create subtitle for index {}: {}",
-                            index, e
-                        );
-                        std::process::exit(1);
-                    }
-                }
+                )
+                .map_err(|e| {
+                    anyhow::anyhow!("Failed to create subtitle for index {}: {}", index, e)
+                })?;
+
+                updated_subtitles.push(subtitle);
             }
             None => {
-                error!(
-                    "reference file does not contain subtitle with index {}",
-                    index
+                output_error(
+                    format,
+                    "reference_index_not_found",
+                    &format!(
+                        "Reference file does not contain subtitle with index {}",
+                        index
+                    ),
+                    Some("Check that the reference file contains all required indices"),
                 );
-                eprintln!(
-                    "error: Reference file does not contain subtitle with index {}",
-                    index
-                );
-                eprintln!("hint: Check that the reference file contains all required indices");
-                std::process::exit(1);
+                return Err(anyhow::anyhow!(""));
             }
         }
     }
 
-    let mut final_subtitles = updated_subtitles;
+    updated_subtitles.sort_by_key(|s| *s.index.as_ref());
 
-    final_subtitles.sort_by_key(|s| *s.index.as_ref());
-
-    debug!(
-        "built final subtitle list with {} entries from anchored file",
-        final_subtitles.len()
-    );
-
-    Ok(final_subtitles)
-}
-
-fn handle_subtitle_error(e: SubtitleError) {
-    match e {
-        SubtitleError::FileNotFound(path) => {
-            error!("file not found: {}", path);
-            eprintln!("error: File not found: {}", path);
-        }
-        SubtitleError::InvalidPath(msg) => {
-            error!("invalid file path: {}", msg);
-            eprintln!("error: Invalid file path: {}", msg);
-        }
-        SubtitleError::CsvParseError { line, message } => {
-            error!("csv parse error at line {}: {}", line, message);
-            eprintln!("error: CSV parsing failed at line {}", line);
-            eprintln!("  {}", message);
-            eprintln!("hint: Check the CSV file format at line {}", line);
-        }
-        SubtitleError::InvalidCsvHeader(delimiter, actual) => {
-            error!(
-                "invalid csv header: expected start_time{}end_time{}text, got {}",
-                delimiter, delimiter, actual
-            );
-            eprintln!("error: Invalid CSV header");
-            eprintln!(
-                "  Expected: start_time{}end_time{}text",
-                delimiter, delimiter
-            );
-            eprintln!("  Got: {}", actual);
-        }
-        SubtitleError::AnchoredParseError { line, message } => {
-            error!("anchored parse error at line {}: {}", line, message);
-            eprintln!("error: Anchored format parsing failed at line {}", line);
-            eprintln!("  {}", message);
-            eprintln!("hint: Ensure format is [INDEX] TEXT with proper structure");
-        }
-        SubtitleError::ReferenceIndexNotFound { index } => {
-            error!("reference file missing index: {}", index);
-            eprintln!("error: Reference file does not contain index {}", index);
-        }
-        SubtitleError::TimestampConflict {
-            last_end,
-            new_start,
-        } => {
-            error!(
-                "timestamp conflict: new subtitle starts at {}, but last subtitle ends at {}",
-                new_start, last_end
-            );
-            eprintln!("error: Timestamp conflict detected");
-            eprintln!("  Previous subtitle ends at: {}", last_end);
-            eprintln!("  New subtitle starts at: {}", new_start);
-            eprintln!("  Each subtitle must start at or after the previous one ends");
-        }
-        SubtitleError::ParseError(err) => {
-            error!("parse error: {}", err);
-            eprintln!("error: Failed to parse file: {}", err);
-        }
-        SubtitleError::BackupFailed(msg) => {
-            error!("backup failed: {}", msg);
-            eprintln!("error: Failed to create backup: {}", msg);
-        }
-        SubtitleError::WriteFailed(msg) => {
-            error!("write failed: {}", msg);
-            eprintln!("error: Failed to write updated file: {}", msg);
-        }
-        SubtitleError::IoError(err) => {
-            error!("i/o error: {}", err);
-            eprintln!("error: I/O error: {}", err);
-        }
-        _ => {
-            error!("unexpected error: {}", e);
-            eprintln!("error: {}", e);
-        }
-    }
+    Ok(updated_subtitles)
 }

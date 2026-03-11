@@ -14,6 +14,15 @@ pub enum ImportFormat {
     Anchored,
 }
 
+#[derive(Clone, Debug, Default, ValueEnum)]
+pub enum OutputFormat {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// Machine-readable JSON output
+    Json,
+}
+
 #[derive(Parser)]
 #[command(name = "sm")]
 #[command(version)]
@@ -26,6 +35,10 @@ pub struct Cli {
     /// Logging target (console, file)
     #[arg(long, default_value = "console")]
     pub log_target: String,
+
+    /// Output format (text, json)
+    #[arg(long, default_value = "text", global = true)]
+    pub output: OutputFormat,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -65,6 +78,10 @@ pub enum Commands {
         /// New subtitle text (can be multi-line with \n)
         #[arg(long)]
         text: Option<String>,
+
+        /// Preview changes without modifying the file
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Diagnose and fix issues in SRT subtitle files
@@ -91,6 +108,10 @@ pub enum Commands {
         /// Subtitle text (can be multi-line with \n)
         #[arg(value_name = "TEXT")]
         text: String,
+
+        /// Preview changes without modifying the file
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Display statistics and information about an SRT file
@@ -239,5 +260,16 @@ pub enum Commands {
         /// Time offset in milliseconds (e.g., "+100", "-500")
         #[arg(value_name = "OFFSET", allow_hyphen_values = true)]
         offset: String,
+
+        /// Preview changes without modifying the file
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Describe available commands and their schemas (always JSON)
+    Describe {
+        /// Optional command name to describe (omit for all)
+        #[arg(value_name = "COMMAND")]
+        command: Option<String>,
     },
 }

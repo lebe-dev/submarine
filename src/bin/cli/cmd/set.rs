@@ -1,12 +1,13 @@
+use crate::cli::OutputFormat;
+use crate::dto::SetResultDto;
+use crate::json_output::{output_error, output_success};
+use crate::utils;
 use lib::backup::ports::BackupService;
 use lib::backup::service::SubRipBackupService;
-use lib::subtitle::model::{
-    Subtitle, SubtitleError, SubtitleText, SubtitleTimestamp, SubtitleUpdate,
-};
+use lib::subtitle::model::{Subtitle, SubtitleText, SubtitleTimestamp, SubtitleUpdate};
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
 use log::{debug, error, info};
-use std::path::Path;
 
 pub fn handle(
     file: &str,
@@ -14,57 +15,27 @@ pub fn handle(
     start: Option<String>,
     end: Option<String>,
     text: Option<String>,
+    dry_run: bool,
+    format: &OutputFormat,
 ) -> anyhow::Result<()> {
     info!("setting subtitle {} in file: {}", index, file);
 
     if start.is_none() && end.is_none() && text.is_none() {
-        error!("no fields specified for update");
-        eprintln!("error: At least one of --start, --end, or --text must be specified");
-        std::process::exit(1);
+        output_error(
+            format,
+            "no_fields_to_update",
+            "At least one of --start, --end, or --text must be specified",
+            None,
+        );
+        return Err(anyhow::anyhow!(""));
     }
 
-    let file_path = Path::new(file);
-    debug!("parsing file path: {:?}", file_path);
-
-    if file_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(file_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", file_path);
-            return Err(anyhow::anyhow!(
-                "invalid file path: path traversal not allowed"
-            ));
-        }
+    // Validate text input
+    if let Some(ref t) = text {
+        utils::reject_control_chars(t, "text")?;
     }
 
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("invalid file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("invalid file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("filename: {}", filename);
+    let resolved = utils::resolve_existing_path(file)?;
 
     let start_timestamp = if let Some(start_str) = start {
         debug!("parsing start timestamp: {}", start_str);
@@ -103,8 +74,70 @@ pub fn handle(
         text: subtitle_text,
     };
 
+    if dry_run {
+        info!("dry-run mode, previewing changes");
+        let service = SubRipService::new(resolved.base_dir);
+
+        // Check subtitle exists and show before/after
+        match service.get_by_id(&resolved.filename, index) {
+            Ok(Some(existing)) => {
+                let updated = update
+                    .apply_to(&existing)
+                    .map_err(|e| anyhow::anyhow!("invalid update: {}", e))?;
+
+                let mut fields = Vec::new();
+                if update.start_time.is_some() {
+                    fields.push("start_time".to_string());
+                }
+                if update.end_time.is_some() {
+                    fields.push("end_time".to_string());
+                }
+                if update.text.is_some() {
+                    fields.push("text".to_string());
+                }
+
+                let dto = SetResultDto {
+                    index,
+                    fields_updated: fields,
+                    backup_path: "N/A (dry-run)".into(),
+                    dry_run: true,
+                };
+
+                output_success(format, &dto, || {
+                    println!("Dry-run: Subtitle {} would be updated", index);
+                    println!();
+                    println!("Before:");
+                    println!("{}", existing);
+                    println!();
+                    println!("After:");
+                    println!("{}", updated);
+                });
+                return Ok(());
+            }
+            Ok(None) => {
+                output_error(
+                    format,
+                    "subtitle_not_found",
+                    &format!("Subtitle with index {} not found in file", index),
+                    None,
+                );
+                return Err(anyhow::anyhow!(""));
+            }
+            Err(e) => {
+                let cli_err = utils::format_subtitle_error(&e, file);
+                output_error(
+                    format,
+                    &cli_err.code,
+                    &cli_err.message,
+                    cli_err.hint.as_deref(),
+                );
+                return Err(anyhow::anyhow!(""));
+            }
+        }
+    }
+
     let backup_service = SubRipBackupService::new();
-    let backup_result = backup_service.create_backup(&canonical_path);
+    let backup_result = backup_service.create_backup(&resolved.full_path);
 
     let backup_path = match backup_result {
         Ok(Some(path)) => {
@@ -113,109 +146,58 @@ pub fn handle(
         }
         Ok(None) => {
             error!("file does not exist, cannot update");
-            eprintln!("error: File does not exist: {}", file);
-            std::process::exit(1);
+            output_error(
+                format,
+                "file_not_found",
+                &format!("File does not exist: {}", file),
+                None,
+            );
+            return Err(anyhow::anyhow!(""));
         }
         Err(e) => {
             error!("failed to create backup: {}", e);
-            eprintln!("error: Failed to create backup: {}", e);
-            std::process::exit(1);
+            output_error(
+                format,
+                "backup_failed",
+                &format!("Failed to create backup: {}", e),
+                None,
+            );
+            return Err(anyhow::anyhow!(""));
         }
     };
 
-    let service = SubRipService::new(base_dir);
+    let service = SubRipService::new(resolved.base_dir);
 
     debug!("updating subtitle {}...", index);
-    match service.set(&filename, index, update) {
+    match service.set(&resolved.filename, index, update) {
         Ok(report) => {
             info!("subtitle {} updated successfully", index);
 
-            println!("✓ Subtitle {} updated successfully", index);
-            println!();
-            println!("Backup: {}", backup_path);
-            println!("Fields updated: {}", report.fields_updated.join(", "));
+            let dto = SetResultDto {
+                index,
+                fields_updated: report.fields_updated.clone(),
+                backup_path: backup_path.clone(),
+                dry_run: false,
+            };
+
+            output_success(format, &dto, || {
+                println!("✓ Subtitle {} updated successfully", index);
+                println!();
+                println!("Backup: {}", backup_path);
+                println!("Fields updated: {}", report.fields_updated.join(", "));
+            });
 
             Ok(())
         }
         Err(e) => {
-            debug!("error occurred: {:?}", e);
-            match e {
-                SubtitleError::FileNotFound(path) => {
-                    error!("file not found: {}", path);
-                    eprintln!("error: File not found: {}", path);
-                }
-                SubtitleError::InvalidPath(msg) => {
-                    error!("invalid file path: {}", msg);
-                    eprintln!("error: Invalid file path: {}", msg);
-                }
-                SubtitleError::SubtitleNotFound(idx) => {
-                    error!("subtitle {} not found", idx);
-                    eprintln!("error: Subtitle with index {} not found in file", idx);
-                }
-                SubtitleError::ParseError(err) => {
-                    error!("parse error: {}", err);
-                    eprintln!("error: Failed to parse subtitle file: {}", err);
-                    eprintln!("hint: Try running 'sm doctor --fix {}' first", file);
-                }
-                SubtitleError::NoFieldsToUpdate => {
-                    error!("no fields to update");
-                    eprintln!("error: At least one of --start, --end, or --text must be specified");
-                }
-                SubtitleError::BackupFailed(msg) => {
-                    error!("backup failed: {}", msg);
-                    eprintln!("error: Failed to create backup: {}", msg);
-                }
-                SubtitleError::WriteFailed(msg) => {
-                    error!("write failed: {}", msg);
-                    eprintln!("error: Failed to write updated file: {}", msg);
-                }
-                SubtitleError::IoError(err) => {
-                    error!("i/o error: {}", err);
-                    eprintln!("error: I/O error: {}", err);
-                }
-                SubtitleError::TimestampConflict {
-                    last_end,
-                    new_start,
-                } => {
-                    error!(
-                        "timestamp conflict: last ends at {}, new starts at {}",
-                        last_end, new_start
-                    );
-                    eprintln!("error: Timestamp conflict");
-                    eprintln!("  Last subtitle ends at: {}", last_end);
-                    eprintln!("  New subtitle starts at: {}", new_start);
-                    eprintln!("  New subtitle must start at or after the last subtitle ends");
-                }
-                SubtitleError::CsvParseError { line, message } => {
-                    error!("csv parse error at line {}: {}", line, message);
-                    eprintln!("error: CSV parsing failed at line {}", line);
-                    eprintln!("  {}", message);
-                }
-                SubtitleError::InvalidCsvHeader(delimiter, actual) => {
-                    error!("invalid csv header: {}", actual);
-                    eprintln!("error: Invalid CSV header");
-                    eprintln!("  Expected delimiter: {}", delimiter);
-                    eprintln!("  Got: {}", actual);
-                }
-                SubtitleError::TimestampOverlap {
-                    line,
-                    existing_end,
-                    new_start,
-                } => {
-                    error!(
-                        "timestamp overlap at line {}: existing ends at {}, new starts at {}",
-                        line, existing_end, new_start
-                    );
-                    eprintln!("error: Timestamp overlap at line {}", line);
-                    eprintln!("  Existing ends at: {}", existing_end);
-                    eprintln!("  New starts at: {}", new_start);
-                }
-                _ => {
-                    error!("unexpected error: {}", e);
-                    eprintln!("error: {}", e);
-                }
-            }
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, file);
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            Err(anyhow::anyhow!(""))
         }
     }
 }

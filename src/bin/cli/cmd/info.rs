@@ -1,9 +1,12 @@
+use crate::cli::OutputFormat;
+use crate::dto::{self, InfoDto};
+use crate::json_output::{output_error, output_success};
+use crate::utils;
 use chrono::Duration;
-use lib::subtitle::model::{Subtitle, SubtitleError};
+use lib::subtitle::model::Subtitle;
 use lib::subtitle::ports::SubtitleService;
 use lib::subtitle::service::SubRipService;
-use log::{debug, error, info};
-use std::path::Path;
+use log::{debug, info};
 
 /// Statistics collected from subtitle file
 struct SubtitleStats {
@@ -18,96 +21,49 @@ struct SubtitleStats {
     subtitles_with_html: usize,
 }
 
-pub fn handle(file: &str) -> anyhow::Result<()> {
+pub fn handle(file: &str, format: &OutputFormat) -> anyhow::Result<()> {
     info!("getting statistics for file: {}", file);
 
-    debug!("validating and canonicalizing path");
-    let file_path = Path::new(file);
-    debug!("parsing file path: {:?}", file_path);
-
-    if file_path.is_relative() {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| anyhow::anyhow!("failed to get current directory: {}", e))?;
-
-        let resolved = current_dir.join(file_path);
-        let normalized = resolved
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-
-        let canonical_current_dir = current_dir
-            .canonicalize()
-            .map_err(|e| anyhow::anyhow!("failed to resolve current directory: {}", e))?;
-
-        if !normalized.starts_with(&canonical_current_dir) {
-            error!("path traversal attempt detected: {:?}", file_path);
-            return Err(anyhow::anyhow!(
-                "invalid file path: path traversal not allowed"
-            ));
-        }
-    }
-
-    let canonical_path = file_path
-        .canonicalize()
-        .map_err(|e| anyhow::anyhow!("failed to resolve file path: {}", e))?;
-    debug!("canonical path: {:?}", canonical_path);
-
-    let base_dir = canonical_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("invalid file path"))?
-        .to_path_buf();
-    debug!("base directory: {:?}", base_dir);
-
-    let filename = canonical_path
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("invalid file name"))?
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("invalid UTF-8 in filename"))?
-        .to_string();
-    debug!("filename: {}", filename);
-
-    debug!("creating service and retrieving subtitles");
-    let service = SubRipService::new(base_dir);
+    let resolved = utils::resolve_existing_path(file)?;
+    let service = SubRipService::new(resolved.base_dir);
 
     debug!("retrieving all subtitles for analysis");
-    match service.get_all(&filename) {
+    match service.get_all(&resolved.filename) {
         Ok(subtitles) => {
             debug!("found {} subtitles", subtitles.len());
 
-            debug!("calculating statistics");
             let stats = calculate_statistics(&subtitles);
 
-            debug!("displaying results");
-            display_statistics(&stats, file);
+            let info_dto = InfoDto {
+                file: file.to_string(),
+                total_count: stats.total_count,
+                total_duration_ms: stats.total_duration.num_milliseconds(),
+                total_duration: Subtitle::format_timestamp(&stats.total_duration),
+                average_subtitle_duration_ms: stats.average_subtitle_duration.num_milliseconds(),
+                average_gap_ms: stats.average_gap.map(|g| g.num_milliseconds()),
+                total_characters: stats.total_characters,
+                total_characters_no_html: stats.total_characters_no_html,
+                total_words: stats.total_words,
+                total_lines: stats.total_lines,
+                subtitles_with_html: stats.subtitles_with_html,
+            };
+
+            output_success(format, &info_dto, || {
+                display_statistics(&stats, file);
+            });
 
             info!("statistics displayed successfully");
             Ok(())
         }
         Err(e) => {
-            debug!("error occurred: {:?}", e);
-            match e {
-                SubtitleError::FileNotFound(path) => {
-                    info!("file not found: {}", path);
-                    eprintln!("error: File not found: {}", path);
-                }
-                SubtitleError::InvalidPath(msg) => {
-                    error!("invalid file path: {}", msg);
-                    eprintln!("error: Invalid file path: {}", msg);
-                }
-                SubtitleError::ParseError(err) => {
-                    error!("parse error: {}", err);
-                    eprintln!("error: Failed to parse subtitle file: {}", err);
-                    eprintln!("hint: Try running 'sm doctor --fix {}' first", file);
-                }
-                SubtitleError::IoError(err) => {
-                    error!("i/o error: {}", err);
-                    eprintln!("error: Failed to read file: {}", err);
-                }
-                _ => {
-                    error!("unexpected error: {}", e);
-                    eprintln!("error: {}", e);
-                }
-            }
-            std::process::exit(1);
+            let cli_err = utils::format_subtitle_error(&e, file);
+            output_error(
+                format,
+                &cli_err.code,
+                &cli_err.message,
+                cli_err.hint.as_deref(),
+            );
+            Err(anyhow::anyhow!(""))
         }
     }
 }
@@ -117,7 +73,6 @@ fn calculate_statistics(subtitles: &[Subtitle]) -> SubtitleStats {
     debug!("calculating statistics for {} subtitles", subtitles.len());
 
     if subtitles.is_empty() {
-        debug!("no subtitles found, returning empty stats");
         return SubtitleStats {
             total_count: 0,
             total_duration: Duration::zero(),
@@ -132,31 +87,17 @@ fn calculate_statistics(subtitles: &[Subtitle]) -> SubtitleStats {
     }
 
     let total_count = subtitles.len();
-    debug!("total count: {}", total_count);
 
-    debug!("calculating total duration from first start to last end");
     let first_start = subtitles.first().unwrap().start_time.as_ref();
     let last_end = subtitles.last().unwrap().end_time.as_ref();
     let total_duration = *last_end - *first_start;
-    debug!(
-        "total duration: {} ms (from {} to {})",
-        total_duration.num_milliseconds(),
-        Subtitle::format_timestamp(first_start),
-        Subtitle::format_timestamp(last_end)
-    );
 
-    debug!("calculating average subtitle duration");
     let sum_durations: i64 = subtitles
         .iter()
         .map(|s| s.duration().num_milliseconds())
         .sum();
     let average_subtitle_duration = Duration::milliseconds(sum_durations / total_count as i64);
-    debug!(
-        "average subtitle duration: {} ms",
-        average_subtitle_duration.num_milliseconds()
-    );
 
-    debug!("calculating gaps between subtitles");
     let average_gap = if total_count > 1 {
         let mut gap_sum: i64 = 0;
         let mut gap_count = 0;
@@ -173,23 +114,14 @@ fn calculate_statistics(subtitles: &[Subtitle]) -> SubtitleStats {
         }
 
         if gap_count > 0 {
-            let avg = Duration::milliseconds(gap_sum / gap_count as i64);
-            debug!(
-                "average gap: {} ms ({} gaps)",
-                avg.num_milliseconds(),
-                gap_count
-            );
-            Some(avg)
+            Some(Duration::milliseconds(gap_sum / gap_count as i64))
         } else {
-            debug!("no positive gaps found");
             None
         }
     } else {
-        debug!("only one subtitle, no gaps");
         None
     };
 
-    debug!("calculating character and word counts");
     let mut total_characters = 0;
     let mut total_characters_no_html = 0;
     let mut total_words = 0;
@@ -213,11 +145,6 @@ fn calculate_statistics(subtitles: &[Subtitle]) -> SubtitleStats {
         }
     }
 
-    debug!(
-        "text stats - chars: {}, chars (no HTML): {}, words: {}, lines: {}, with HTML: {}",
-        total_characters, total_characters_no_html, total_words, total_lines, subtitles_with_html
-    );
-
     SubtitleStats {
         total_count,
         total_duration,
@@ -231,30 +158,8 @@ fn calculate_statistics(subtitles: &[Subtitle]) -> SubtitleStats {
     }
 }
 
-/// Format duration to human-readable string (e.g., "1h 23m 45s")
-fn format_duration_readable(duration: &Duration) -> String {
-    let total_seconds = duration.num_seconds();
-
-    let hours = total_seconds / 3600;
-    let minutes = (total_seconds % 3600) / 60;
-    let seconds = total_seconds % 60;
-    let milliseconds = duration.num_milliseconds() % 1000;
-
-    if hours > 0 {
-        format!("{}h {}m {}s", hours, minutes, seconds)
-    } else if minutes > 0 {
-        format!("{}m {}s", minutes, seconds)
-    } else if seconds > 0 {
-        format!("{}.{:03}s", seconds, milliseconds)
-    } else {
-        format!("{}ms", milliseconds)
-    }
-}
-
 /// Display statistics in a formatted, user-friendly way
 fn display_statistics(stats: &SubtitleStats, filename: &str) {
-    debug!("displaying statistics");
-
     println!("Subtitle File Information");
     println!("========================");
     println!();
@@ -262,7 +167,6 @@ fn display_statistics(stats: &SubtitleStats, filename: &str) {
     println!();
 
     if stats.total_count == 0 {
-        debug!("handling empty file case");
         println!("No subtitles found in file.");
         return;
     }
@@ -272,7 +176,7 @@ fn display_statistics(stats: &SubtitleStats, filename: &str) {
     println!(
         "  Total duration:  {} ({})",
         Subtitle::format_timestamp(&stats.total_duration),
-        format_duration_readable(&stats.total_duration)
+        dto::format_duration_readable(&stats.total_duration)
     );
     println!();
 
@@ -404,30 +308,6 @@ mod tests {
 
         assert_eq!(stats.total_lines, 3);
         assert_eq!(stats.total_words, 6);
-    }
-
-    #[test]
-    fn test_format_duration_readable_hours() {
-        let duration = Duration::seconds(3661);
-        assert_eq!(format_duration_readable(&duration), "1h 1m 1s");
-    }
-
-    #[test]
-    fn test_format_duration_readable_minutes() {
-        let duration = Duration::seconds(125);
-        assert_eq!(format_duration_readable(&duration), "2m 5s");
-    }
-
-    #[test]
-    fn test_format_duration_readable_seconds() {
-        let duration = Duration::milliseconds(2450);
-        assert_eq!(format_duration_readable(&duration), "2.450s");
-    }
-
-    #[test]
-    fn test_format_duration_readable_milliseconds() {
-        let duration = Duration::milliseconds(450);
-        assert_eq!(format_duration_readable(&duration), "450ms");
     }
 
     #[test]

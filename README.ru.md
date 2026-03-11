@@ -16,18 +16,25 @@ Submarine помогает в процессе перевода, предост�
 
 - Формат субтитров: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
 - Поддерживаемые сценарии работы:
-  - Агент: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md)
-  - Чат-бот: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md)
+  - Агент: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md), [De](docs/AGENT-TRANSLATION-FLOW.DE.md), [Es](docs/AGENT-TRANSLATION-FLOW.ES.md)
+  - Чат-бот: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md), [De](docs/CHATBOT-TRANSLATION-FLOW.DE.md), [Es](docs/CHATBOT-TRANSLATION-FLOW.ES.md)
 - **Инструменты:**
-  - Получить субтитр по индексу
+  - Получить субтитр по индексу или диапазону
   - Добавить новый субтитр
-  - Импортировать субтитры из файла
-  - Обновить субтитр со смещением
+  - Изменить свойства субтитра
+  - Импортировать субтитры из файла (CSV, формат с якорями)
+  - Сдвиг временны́х меток
   - Массовое переименование файлов субтитров
   - Экспорт субтитров в формате с якорями
+  - Диагностика и исправление ошибок файла (`doctor`)
 - **Проверка:**
   - Сравнение переведённых субтитров с оригиналом
   - Отслеживание прогресса перевода
+- **Удобство для агентов:**
+  - Структурированный JSON-вывод (`--output json`) для всех команд
+  - Предпросмотр изменений (`--dry-run`) для всех мутирующих команд
+  - Интроспекция схемы команд (`sm describe`)
+  - Машиночитаемые коды ошибок и подсказки
 - **Автобэкапы:** автоматически создают резервные копии файлов перед внесением изменений.
 
 ## Установка
@@ -43,9 +50,9 @@ brew install lebe-dev/tap/submarine
 ### Linux
 
 ```bash
-curl -L -o sm-0.13.1-linux-amd64.zip \
-  https://github.com/lebe-dev/submarine/releases/download/0.13.1/sm-0.13.1-linux-amd64.zip
-unzip sm-0.13.1-linux-amd64.zip
+curl -L -o sm-0.14.0-linux-amd64.zip \
+  https://github.com/lebe-dev/submarine/releases/download/0.14.0/sm-0.14.0-linux-amd64.zip
+unzip sm-0.14.0-linux-amd64.zip
 sudo install -m 0755 sm /usr/local/bin/sm
 sm --help
 ```
@@ -77,22 +84,25 @@ First subtitle
 Second subtitle
 
 # Установить субтитр по индексу
-# sm set [FILE.srt] [INDEX] \
+# sm set [--dry-run] [FILE.srt] [INDEX] \
 #       [--start=00:00:03,481] \
 #       [--end=00:00:04,481] \
 #       [--text "TEXT"]
 $ sm set Resident.Alien.S01E01.srt 123 \
        --text "Okay"
 
+# Предпросмотр изменений без изменения файла
+$ sm set --dry-run Resident.Alien.S01E01.srt 123 --text "Okay"
+
 # Добавить субтитр в конец файла
 # Автоматически увеличивает индекс и создаёт бэкап
 # Создаёт srt-файл, если он не существует
-# sm add [FILE.srt] [START-END-TIMESTAMP] "[NEW-SUBTITLE]"
+# sm add [--dry-run] [FILE.srt] [START-END-TIMESTAMP] "[NEW-SUBTITLE]"
 $ sm add Resident.Alien.S01E01.srt "00:03:03,481-00:03:04,481" "Okay"
 
 # Сдвинуть временны́е метки на заданное смещение
 # Поддерживает положительные и отрицательные значения в миллисекундах
-# sm delay [FILE.srt] [OFFSET]
+# sm delay [--dry-run] [FILE.srt] [OFFSET]
 $ sm delay Resident.Alien.S01E01.srt "+1000"  # Добавить 1 секунду
 $ sm delay Resident.Alien.S01E01.srt "-500"   # Убрать 0.5 секунды
 
@@ -154,6 +164,16 @@ $ sm export --format=anchored movie.eng.srt 1-50
 [3] Good to hear.
 ...
 [50] See you tomorrow.
+
+# JSON-вывод (доступен для всех команд кроме compare)
+$ sm get Resident.Alien.S01E01.srt 1 --output json
+{"ok":true,"data":{"index":1,"start_time":"00:00:01,436",...}}
+
+$ sm info Resident.Alien.S01E01.srt --output json
+
+# Описание доступных команд и их схем
+$ sm describe
+$ sm describe get
 ```
 
 ## Использование как библиотека
@@ -162,6 +182,5 @@ $ sm export --format=anchored movie.eng.srt 1-50
 
 ## Дорожная карта
 
-- Рефакторинг кода
 - Функция: синхронизация
 - Функция: слияние
