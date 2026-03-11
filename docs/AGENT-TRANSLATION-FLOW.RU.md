@@ -2,6 +2,8 @@
 
 Как перевести субтитры с одного языка на другой с помощью submarine и LLM-агента (Codex, Claude Code, opencode, etc.).
 
+**Язык:** [EN](AGENT-TRANSLATION-FLOW.md) | **RU** | [DE](AGENT-TRANSLATION-FLOW.DE.md) | [ES](AGENT-TRANSLATION-FLOW.ES.md)
+
 Например, вы хотите перевести 8-ю серию 3-го сезона сериала **Resident Alien** на русский язык.
 
 **Требования:**

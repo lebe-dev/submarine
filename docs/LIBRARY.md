@@ -1,6 +1,8 @@
 # Using Submarine as a Library
 
-Submarine is designed primarily as a command-line tool, but its core functionality is available as a library that you can integrate into your own Rust projects. This guide will walk you through the basics of using the `submarine-rs` library.
+Submarine is designed primarily as a command-line tool, but its core functionality is available as a library that you can integrate into your own Rust projects.
+
+**Language:** **EN** | [DE](LIBRARY.DE.md) | [ES](LIBRARY.ES.md) This guide will walk you through the basics of using the `submarine-rs` library.
 
 ## Adding `submarine-rs` to Your Project
 

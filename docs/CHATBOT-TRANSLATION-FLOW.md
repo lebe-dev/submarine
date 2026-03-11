@@ -2,6 +2,8 @@
 
 How to translate subtitles from one language to another using the submarine tool and LLM chatbot (ChatGPT, Claude, DeepSeek, etc.).
 
+**Language:** **EN** | [RU](CHATBOT-TRANSLATION-FLOW.RU.md) | [DE](CHATBOT-TRANSLATION-FLOW.DE.md) | [ES](CHATBOT-TRANSLATION-FLOW.ES.md)
+
 For example, you'd like to translate Episode 8 from Resident Alien Season 3 to Russian.
 
 **Requirements:**

@@ -4,6 +4,8 @@ Submarine is a tiny toolkit for LLM translation assistance.
 
 ![Submarine Toolkit Logo](logo.png)
 
+**Language:** **EN** | [RU](README.ru.md) | [DE](README.de.md) | [ES](README.es.md)
+
 ## Motivation
 
 I prefer watching movies, cartoons, and anime with the original audio. However, subtitles are often unavailable in my language. While we can now use LLMs to translate subtitles, they aren't perfect. They sometimes make mistakes, such as messing up subtitle numbering or timestamps. Even the best models fail often.
@@ -13,9 +15,9 @@ Submarine is designed to assist the translation process by providing various edi
 ## Features
 
 - Subtitles format: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
-- Supported flows: 
-  - Agent: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md)
-  - Chatbot: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md)
+- Supported flows:
+  - Agent: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md), [De](docs/AGENT-TRANSLATION-FLOW.DE.md), [Es](docs/AGENT-TRANSLATION-FLOW.ES.md)
+  - Chatbot: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md), [De](docs/CHATBOT-TRANSLATION-FLOW.DE.md), [Es](docs/CHATBOT-TRANSLATION-FLOW.ES.md)
 - **Toolset:**
   - Get subtitle by index
   - Add a new subtitle

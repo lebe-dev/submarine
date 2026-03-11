@@ -2,6 +2,8 @@
 
 Как переводить субтитры с одного языка на другой с помощью инструмента submarine и LLM-чат-бота (ChatGPT, Claude, DeepSeek и т.д.).
 
+**Язык:** [EN](CHATBOT-TRANSLATION-FLOW.md) | **RU** | [DE](CHATBOT-TRANSLATION-FLOW.DE.md) | [ES](CHATBOT-TRANSLATION-FLOW.ES.md)
+
 Например, вы хотите перевести 8-ю серию 3-го сезона сериала "Засланец из космоса" (Resident Alien) на русский язык.
 
 **Требования:**

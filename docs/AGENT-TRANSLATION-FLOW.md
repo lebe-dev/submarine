@@ -2,6 +2,8 @@
 
 How to translate subtitles from one language to another using the submarine tool and LLM agent (Codex, Claude Code, opencode, etc.).
 
+**Language:** **EN** | [RU](AGENT-TRANSLATION-FLOW.RU.md) | [DE](AGENT-TRANSLATION-FLOW.DE.md) | [ES](AGENT-TRANSLATION-FLOW.ES.md)
+
 For example, you'd like to translate Episode 8 from Resident Alien Season 3 to Russian.
 
 **Requirements:**
