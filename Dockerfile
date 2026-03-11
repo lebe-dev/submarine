@@ -1,8 +1,8 @@
-FROM rust:1.92.0-alpine3.23 AS build
+FROM rust:1.94.0-alpine3.23 AS build
 
 WORKDIR /build
 
-RUN apk add elfutils pkgconfig perl make just upx musl-dev
+RUN apk add --no-cache elfutils pkgconfig perl make just upx musl-dev
 
 COPY . .
 
