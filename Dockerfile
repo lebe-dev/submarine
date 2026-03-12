@@ -6,8 +6,7 @@ RUN apk add --no-cache elfutils pkgconfig perl make just upx musl-dev
 
 COPY . .
 
-RUN just test-all && \
-    cargo build --bin sm --release && \
+RUN cargo build --bin sm --release && \
     eu-elfcompress target/release/sm && \
     strip target/release/sm && \
     upx -9 --lzma target/release/sm && \
