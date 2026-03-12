@@ -3,6 +3,7 @@
 !README.md
 !README.*.md
 !DEV.md
+!CONTEXT.md
 !translate-prompt-template.md
 .env
 /out
