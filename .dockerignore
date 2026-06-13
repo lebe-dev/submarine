@@ -1,8 +1,9 @@
-/target
+/vendor
+/helm-chart
 *.md
 .env
-/out
 /*.zip
 /*.srt
 /backups
 .DS_Store
+/sm
