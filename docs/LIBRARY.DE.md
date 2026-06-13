@@ -1,138 +1,168 @@
 # Submarine als Bibliothek verwenden
 
-Submarine ist primär als Befehlszeilenwerkzeug konzipiert, seine Kernfunktionalität steht jedoch auch als Bibliothek zur Verfügung, die Sie in eigene Rust-Projekte integrieren können. Diese Anleitung führt Sie durch die Grundlagen der Verwendung der `submarine-rs`-Bibliothek.
+Submarine ist primär als Befehlszeilenwerkzeug konzipiert, seine Kernfunktionalität steht jedoch auch als Bibliothek zur Verfügung, die Sie in eigene Go-Projekte integrieren können.
 
 **Sprache:** [EN](LIBRARY.md) | **DE** | [ES](LIBRARY.ES.md)
 
-## `submarine-rs` zum Projekt hinzufügen
+Diese Anleitung führt Sie durch die Grundlagen der Verwendung der `submarine`-Bibliothek.
 
-Um `submarine-rs` als Bibliothek zu verwenden, fügen Sie es zuerst in Ihrer `Cargo.toml` hinzu.
+## `submarine` zu Ihrem Projekt hinzufügen
 
-```toml
-[dependencies]
-submarine-rs = { git = "https://github.com/lebe-dev/submarine" }
+`submarine` ist ein Go-Modul. Fügen Sie es mit `go get` zu Ihrem Projekt hinzu:
+
+```bash
+go get github.com/lebe-dev/submarine
 ```
 
-Hinweis: Da `submarine-rs` noch nicht auf crates.io veröffentlicht ist, müssen Sie es direkt aus dem Git-Repository einbinden.
+Es erfordert Go 1.26 oder neuer. Die wiederverwendbaren Bibliothekspakete liegen unter `pkg/` (der reine CLI-Code verbleibt in `internal/` und ist nicht importierbar).
 
-## Grundkonzepte
+## Kernkonzepte
 
-Die Funktionalität der Bibliothek ist auf den Trait `SubtitleService` ausgerichtet, der die primären Operationen für die Arbeit mit Untertiteldateien definiert. Die Hauptimplementierung dieses Traits ist `SubRipService`, der mit SubRip-Dateien (.srt) arbeitet.
+Die Funktionalität der Bibliothek dreht sich um die Schnittstelle `Service` im Paket `pkg/subtitle`, die die wichtigsten Operationen für die Arbeit mit Untertiteldateien definiert. Die Hauptimplementierung ist `SubRipService`, die mit SubRip-Dateien (.srt) arbeitet.
 
-- **`Subtitle`**: Dieses Struct repräsentiert einen einzelnen Untertiteleintrag, einschließlich Index, Start- und End-Zeitstempel sowie Text.
-- **`SubRipService`**: Dies ist der Einstiegspunkt für die meisten dateibasierten Operationen. Er ermöglicht das Lesen, Schreiben und Ändern von .srt-Dateien.
+- **`subtitle.Subtitle`**: stellt einen einzelnen Untertiteleintrag dar — seinen Index, Start- und End-Zeitstempel sowie den Text.
+- **`subtitle.SubRipService`**: der Einstiegspunkt für die meisten dateibasierten Operationen. Damit können Sie .srt-Dateien lesen, schreiben und ändern.
+
+Validierte Wertetypen (`SubtitleIndex`, `SubtitleTimestamp`, `SubtitleText`) werden über `New…`-Funktionen erzeugt, die einen `error` zurückgeben, wenn die Eingabe ungültig ist (z. B. muss ein Index `>= 1` sein, der Text darf nicht leer sein). Das entspricht den Garantien, die die Rust-Version mit `nutype` durchgesetzt hat.
 
 ## Grundlegende Verwendung
 
-Hier ist ein einfaches Beispiel, wie man die Bibliothek verwendet, um Untertitel aus einer Datei zu lesen, einen neuen Untertitel hinzuzufügen und das Ergebnis in eine neue Datei zu schreiben.
+Hier ist ein einfaches Beispiel, wie man mit der Bibliothek Untertitel aus einer Datei liest, einen neuen Untertitel hinzufügt und das Ergebnis in eine neue Datei schreibt. Das vollständige, ausführbare Programm befindet sich in [`examples/simple/main.go`](../examples/simple/main.go) — führen Sie es mit `go run ./examples/simple` aus.
 
-Der vollständige Code ist auch in `examples/simple.rs` zu finden.
+```go
+package main
 
-```rust
-use chrono::Duration;
-use lib::subtitle::model::{Subtitle, SubtitleIndex, SubtitleText, SubtitleTimestamp};
-use lib::subtitle::ports::SubtitleService;
-use lib::subtitle::service::SubRipService;
-use std::fs;
+import (
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Der Service der Bibliothek ist dateibasiert.
-    // Wir erstellen eine Service-Instanz, die im Verzeichnis 'examples' arbeitet.
-    let service = SubRipService::new("examples");
-    let sample_filename = "sample.srt";
-    let output_filename = "output.srt";
-    let sample_filepath = format!("examples/{}", sample_filename);
-    let output_filepath = format!("examples/{}", output_filename);
+	"github.com/lebe-dev/submarine/pkg/subtitle"
+)
 
-    // Beispiel 1: Beispieldatei erstellen und Untertitel daraus laden
-    println!("--- Untertitel aus Datei laden ---");
-    let srt_content = "1\n00:00:03,000 --> 00:00:04,000\nThis is a sample subtitle.\n\n2\n00:00:05,000 --> 00:00:06,000\nThis is another one.\n";
-    fs::write(&sample_filepath, srt_content)?;
+func main() {
+	// Der Service ist dateibasiert; jeder Dateiname wird relativ zu diesem
+	// Basisverzeichnis aufgelöst. Wir verwenden ein temporäres Verzeichnis,
+	// damit das Beispiel in sich abgeschlossen ist.
+	baseDir, err := os.MkdirTemp("", "submarine-example-*")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(baseDir)
 
-    let mut subtitles = service.get_all(sample_filename)?;
+	service := subtitle.NewSubRipService(baseDir)
 
-    println!("Geladene {} Untertitel aus {}:", subtitles.len(), sample_filename);
-    for sub in &subtitles {
-        println!("{}", sub.to_string().trim());
-        println!("---");
-    }
+	// 1. Eine Beispieldatei erstellen und Untertitel daraus laden.
+	srtContent := "1\n00:00:03,000 --> 00:00:04,000\nThis is a sample subtitle.\n\n" +
+		"2\n00:00:05,000 --> 00:00:06,000\nThis is another one.\n"
+	if err := os.WriteFile(filepath.Join(baseDir, "sample.srt"), []byte(srtContent), 0o644); err != nil {
+		log.Fatal(err)
+	}
 
-    // Beispiel 2: Untertitel programmatisch erstellen und zum Vektor hinzufügen
-    println!("\n--- Neuen Untertitel erstellen und hinzufügen ---");
-    let new_subtitle = Subtitle::new(
-        SubtitleIndex::try_new(3)?,
-        SubtitleTimestamp::try_new(Duration::milliseconds(7000))?,
-        SubtitleTimestamp::try_new(Duration::milliseconds(8000))?,
-        SubtitleText::try_new("This is a new subtitle, created in code.".to_string())?,
-    )?;
-    println!("Neuer Untertitel erstellt:\n{}", new_subtitle);
-    subtitles.push(new_subtitle);
+	subtitles, err := service.GetAll("sample.srt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Loaded %d subtitles\n", len(subtitles))
+	for _, sub := range subtitles {
+		fmt.Println(strings.TrimSpace(sub.String()))
+	}
 
-    // Beispiel 3: Die modifizierte Untertitelliste in eine neue Datei speichern
-    println!("\n--- Untertitel in Datei speichern ---");
-    service.write_all(output_filename, &subtitles)?;
-    println!("Untertitel gespeichert in {}", output_filepath);
+	// 2. Einen Untertitel programmatisch erstellen.
+	index, err := subtitle.NewSubtitleIndex(3)
+	if err != nil {
+		log.Fatal(err)
+	}
+	start, err := subtitle.NewSubtitleTimestamp(7000 * time.Millisecond)
+	if err != nil {
+		log.Fatal(err)
+	}
+	end, err := subtitle.NewSubtitleTimestamp(8000 * time.Millisecond)
+	if err != nil {
+		log.Fatal(err)
+	}
+	text, err := subtitle.NewSubtitleText("This is a new subtitle, created in code.")
+	if err != nil {
+		log.Fatal(err)
+	}
+	newSubtitle, err := subtitle.NewSubtitle(index, start, end, text)
+	if err != nil {
+		log.Fatal(err)
+	}
+	subtitles = append(subtitles, newSubtitle)
 
-    // Inhalt der Ausgabedatei überprüfen
-    let output_content = fs::read_to_string(&output_filepath)?;
-    println!("\n--- Inhalt von {} ---", output_filename);
-    println!("{}", output_content.trim());
-    println!("---");
-
-    // Erstellte Dateien aufräumen
-    fs::remove_file(&sample_filepath)?;
-    fs::remove_file(&output_filepath)?;
-    println!("\nTemporäre Dateien bereinigt.");
-
-    Ok(())
+	// 3. Die geänderte Liste in eine neue Datei speichern.
+	if err := service.WriteAll("output.srt", subtitles); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Subtitles saved to output.srt")
 }
 ```
 
 ### Schritt-für-Schritt-Erklärung
 
 1. **`SubRipService` instanziieren**:
-   `SubRipService` benötigt ein Basisverzeichnis. Alle angegebenen Dateinamen sind relativ zu diesem Pfad.
+   Der Service benötigt ein Basisverzeichnis. Alle Dateinamen, die Sie angeben, werden relativ zu diesem Pfad aufgelöst.
 
-   ```rust
-   use lib::subtitle::service::SubRipService;
-   let service = SubRipService::new("examples");
+   ```go
+   service := subtitle.NewSubRipService(baseDir)
    ```
 
 2. **Untertitel lesen**:
-   Die Methode `get_all` liest eine .srt-Datei und gibt bei Erfolg einen `Vec<Subtitle>` zurück.
+   `GetAll` liest eine .srt-Datei und gibt ein `[]subtitle.Subtitle` zurück.
 
-   ```rust
-   let subtitles = service.get_all("sample.srt")?;
+   ```go
+   subtitles, err := service.GetAll("sample.srt")
    ```
 
-3. **Neuen Untertitel erstellen**:
-   Sie können neue `Subtitle`-Instanzen programmatisch erstellen. Die Bibliothek verwendet `nutype`, um sicherzustellen, dass alle Daten gültig sind (z.B. müssen Untertitel-Indizes positiv sein, Text darf nicht leer sein).
+3. **Einen neuen Untertitel erstellen**:
+   Sie bauen einen `Subtitle` aus validierten Wertetypen. Jeder `New…`-Konstruktor gibt einen `error` zurück, wenn die Eingabe ungültig ist (Indizes müssen positiv sein, der Text darf nicht leer sein, das Ende muss nach dem Start liegen).
 
-   ```rust
-   use chrono::Duration;
-   use lib::subtitle::model::{Subtitle, SubtitleIndex, SubtitleText, SubtitleTimestamp};
-
-   let new_subtitle = Subtitle::new(
-       SubtitleIndex::try_new(3)?,
-       SubtitleTimestamp::try_new(Duration::milliseconds(7000))?,
-       SubtitleTimestamp::try_new(Duration::milliseconds(8000))?,
-       SubtitleText::try_new("This is a new subtitle, created in code.".to_string())?,
-   )?;
+   ```go
+   index, err := subtitle.NewSubtitleIndex(3)
+   start, err := subtitle.NewSubtitleTimestamp(7000 * time.Millisecond)
+   end, err := subtitle.NewSubtitleTimestamp(8000 * time.Millisecond)
+   text, err := subtitle.NewSubtitleText("This is a new subtitle, created in code.")
+   newSubtitle, err := subtitle.NewSubtitle(index, start, end, text)
    ```
 
 4. **Untertitel schreiben**:
-   Die Methode `write_all` nimmt ein Slice von `Subtitle`s und schreibt sie in eine Datei, wobei sie diese überschreibt, falls sie existiert.
+   `WriteAll` nimmt einen Slice von `Subtitle`s und schreibt sie in eine Datei, die überschrieben wird, falls sie existiert.
 
-   ```rust
-   service.write_all("output.srt", &subtitles)?;
+   ```go
+   err := service.WriteAll("output.srt", subtitles)
    ```
 
-## Weitere Erkundung
+## Weiterführende Erkundung
 
-Für fortgeschrittenere Anwendungsfälle können Sie die anderen Methoden des `SubtitleService`-Traits erkunden, wie zum Beispiel:
+Für fortgeschrittene Nutzung erkunden Sie die weiteren Methoden der Schnittstelle `subtitle.Service`:
 
-- `get_by_id`: Einen einzelnen Untertitel anhand seines Index abrufen.
-- `set`: Einen vorhandenen Untertitel aktualisieren.
-- `add`: Einen neuen Untertitel an eine Datei anhängen.
+- `GetByID(filename, id)` — einen einzelnen Untertitel anhand seines Index abrufen (gibt `(nil, nil)` zurück, wenn nicht gefunden).
+- `Set(filename, id, update)` — einen vorhandenen Untertitel aktualisieren.
+- `Add(filename, start, end, text)` — einen neuen Untertitel an eine Datei anhängen.
 
-Detailliertere Informationen finden Sie in der Quellcode-Dokumentation.
+Neben `pkg/subtitle` decken die übrigen Bibliothekspakete die restlichen Funktionen des Werkzeugkastens ab:
+
+| Paket | Zweck |
+|---|---|
+| `pkg/subtitle` | Kerndomänenmodell, SRT-Parsing/-Schreiben (`SubRipService`) |
+| `pkg/backup` | Zeitgestempelte Datei-Backups (`SubRipBackupService`) |
+| `pkg/doctor` | Fehlerhafte SRT-Dateien diagnostizieren und reparieren |
+| `pkg/importer` | Untertitel aus CSV- und Anchored-Formaten importieren |
+| `pkg/rename` | Vorlagenbasiertes Massenumbenennen von Untertiteldateien |
+| `pkg/verify` | Zwei Dateien auf Index-/Zeitstempel-Abweichungen vergleichen (`CompareSubtitles`) |
+| `pkg/translationstatus` | Übersetzungsfortschritt gegen eine Referenz (`CheckTranslationStatus`) |
+
+## Hinweis zum Logging
+
+Die Bibliothek protokolliert über das Standardpaket `log/slog`. Standardmäßig schreibt Gos `slog` Einträge der Stufe `Info` nach stderr, sodass beim Aufruf von Bibliotheksfunktionen Log-Zeilen erscheinen können. Um sie zu steuern oder stummzuschalten, installieren Sie Ihren eigenen Standard-Handler, z. B.:
+
+```go
+import "log/slog"
+
+// Nur Warnungen und höher anzeigen.
+slog.SetLogLoggerLevel(slog.LevelWarn)
+```

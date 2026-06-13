@@ -1,19 +1,26 @@
-FROM rust:1.94.0-alpine3.23 AS build
+FROM golang:1.26-alpine3.23 AS app-build
 
 WORKDIR /build
 
-RUN apk add --no-cache elfutils pkgconfig perl make just upx musl-dev
+RUN apk --no-cache add upx
 
-COPY . .
+COPY go.mod go.sum ./
+RUN go mod download
 
-RUN cargo build --bin sm --release && \
-    eu-elfcompress target/release/sm && \
-    strip target/release/sm && \
-    upx -9 --lzma target/release/sm && \
-    chmod +x target/release/sm
+COPY . /build
+
+ARG VERSION=dev
+
+RUN CGO_ENABLED=0 go build -ldflags="-w -s -X main.version=${VERSION}" -o sm ./cmd/sm && \
+    upx -9 --lzma sm && \
+    chmod +x sm
 
 FROM scratch
 
-COPY --from=build /build/target/release/sm /sm
+WORKDIR /app
 
-ENTRYPOINT ["/sm"]
+COPY --from=app-build --chown=10001:10001 /build/sm /app/sm
+
+USER 10001:10001
+
+ENTRYPOINT ["/app/sm"]

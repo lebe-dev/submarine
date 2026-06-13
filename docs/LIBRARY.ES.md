@@ -1,138 +1,168 @@
 # Usar Submarine como biblioteca
 
-Submarine está diseñado principalmente como herramienta de línea de comandos, pero su funcionalidad principal también está disponible como biblioteca que puede integrar en sus propios proyectos Rust. Esta guía le explica los conceptos básicos para usar la biblioteca `submarine-rs`.
+Submarine está diseñado principalmente como herramienta de línea de comandos, pero su funcionalidad principal también está disponible como biblioteca que puede integrar en sus propios proyectos Go.
 
 **Idioma:** [EN](LIBRARY.md) | [DE](LIBRARY.DE.md) | **ES**
 
-## Añadir `submarine-rs` a su proyecto
+Esta guía le explica los conceptos básicos para usar la biblioteca `submarine`.
 
-Para usar `submarine-rs` como biblioteca, primero añádala a su archivo `Cargo.toml`.
+## Añadir `submarine` a su proyecto
 
-```toml
-[dependencies]
-submarine-rs = { git = "https://github.com/lebe-dev/submarine" }
+`submarine` es un módulo de Go. Añádalo a su proyecto con `go get`:
+
+```bash
+go get github.com/lebe-dev/submarine
 ```
 
-Nota: Como `submarine-rs` todavía no está publicada en crates.io, debe añadirla directamente desde su repositorio Git.
+Requiere Go 1.26 o superior. Los paquetes reutilizables de la biblioteca se encuentran en `pkg/` (el código exclusivo de la CLI permanece en `internal/` y no es importable).
 
 ## Conceptos principales
 
-La funcionalidad de la biblioteca se centra en el trait `SubtitleService`, que define las operaciones principales para trabajar con archivos de subtítulos. La implementación principal de este trait es `SubRipService`, que trabaja con archivos SubRip (.srt).
+La funcionalidad de la biblioteca se centra en la interfaz `Service` del paquete `pkg/subtitle`, que define las operaciones principales para trabajar con archivos de subtítulos. La implementación principal es `SubRipService`, que trabaja con archivos SubRip (.srt).
 
-- **`Subtitle`**: Esta struct representa una única entrada de subtítulo, incluyendo su índice, marcas de tiempo de inicio y fin, y texto.
-- **`SubRipService`**: Es el punto de entrada para la mayoría de las operaciones basadas en archivos. Permite leer, escribir y modificar archivos .srt.
+- **`subtitle.Subtitle`**: representa una entrada de subtítulo individual: su índice, las marcas de tiempo de inicio y fin, y el texto.
+- **`subtitle.SubRipService`**: el punto de entrada para la mayoría de las operaciones basadas en archivos. Permite leer, escribir y modificar archivos .srt.
+
+Los tipos de valor validados (`SubtitleIndex`, `SubtitleTimestamp`, `SubtitleText`) se construyen mediante funciones `New…` que devuelven un `error` cuando la entrada no es válida (por ejemplo, un índice debe ser `>= 1`, el texto no puede estar vacío). Esto refleja las garantías que la versión en Rust imponía con `nutype`.
 
 ## Uso básico
 
-A continuación se muestra un ejemplo simple de cómo usar la biblioteca para leer subtítulos de un archivo, añadir un nuevo subtítulo y guardar el resultado en un nuevo archivo.
+Aquí tiene un ejemplo sencillo de cómo usar la biblioteca para leer subtítulos de un archivo, añadir uno nuevo y escribir el resultado en un archivo nuevo. El programa completo y ejecutable está en [`examples/simple/main.go`](../examples/simple/main.go); ejecútelo con `go run ./examples/simple`.
 
-El código completo también está disponible en `examples/simple.rs`.
+```go
+package main
 
-```rust
-use chrono::Duration;
-use lib::subtitle::model::{Subtitle, SubtitleIndex, SubtitleText, SubtitleTimestamp};
-use lib::subtitle::ports::SubtitleService;
-use lib::subtitle::service::SubRipService;
-use std::fs;
+import (
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // El servicio de la biblioteca está basado en archivos.
-    // Creamos una instancia del servicio que opera en el directorio 'examples'.
-    let service = SubRipService::new("examples");
-    let sample_filename = "sample.srt";
-    let output_filename = "output.srt";
-    let sample_filepath = format!("examples/{}", sample_filename);
-    let output_filepath = format!("examples/{}", output_filename);
+	"github.com/lebe-dev/submarine/pkg/subtitle"
+)
 
-    // Ejemplo 1: Crear un archivo de muestra y cargar subtítulos de él
-    println!("--- Cargando subtítulos de un archivo ---");
-    let srt_content = "1\n00:00:03,000 --> 00:00:04,000\nThis is a sample subtitle.\n\n2\n00:00:05,000 --> 00:00:06,000\nThis is another one.\n";
-    fs::write(&sample_filepath, srt_content)?;
+func main() {
+	// El servicio se basa en archivos; cada nombre de archivo se resuelve en
+	// relación con este directorio base. Usamos un directorio temporal para que
+	// el ejemplo sea autónomo.
+	baseDir, err := os.MkdirTemp("", "submarine-example-*")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(baseDir)
 
-    let mut subtitles = service.get_all(sample_filename)?;
+	service := subtitle.NewSubRipService(baseDir)
 
-    println!("Cargados {} subtítulos de {}:", subtitles.len(), sample_filename);
-    for sub in &subtitles {
-        println!("{}", sub.to_string().trim());
-        println!("---");
-    }
+	// 1. Crear un archivo de ejemplo y cargar los subtítulos desde él.
+	srtContent := "1\n00:00:03,000 --> 00:00:04,000\nThis is a sample subtitle.\n\n" +
+		"2\n00:00:05,000 --> 00:00:06,000\nThis is another one.\n"
+	if err := os.WriteFile(filepath.Join(baseDir, "sample.srt"), []byte(srtContent), 0o644); err != nil {
+		log.Fatal(err)
+	}
 
-    // Ejemplo 2: Crear un subtítulo programáticamente y añadirlo al vector
-    println!("\n--- Creando un nuevo subtítulo y añadiéndolo ---");
-    let new_subtitle = Subtitle::new(
-        SubtitleIndex::try_new(3)?,
-        SubtitleTimestamp::try_new(Duration::milliseconds(7000))?,
-        SubtitleTimestamp::try_new(Duration::milliseconds(8000))?,
-        SubtitleText::try_new("This is a new subtitle, created in code.".to_string())?,
-    )?;
-    println!("Nuevo subtítulo creado:\n{}", new_subtitle);
-    subtitles.push(new_subtitle);
+	subtitles, err := service.GetAll("sample.srt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Loaded %d subtitles\n", len(subtitles))
+	for _, sub := range subtitles {
+		fmt.Println(strings.TrimSpace(sub.String()))
+	}
 
-    // Ejemplo 3: Guardar la lista modificada de subtítulos en un nuevo archivo
-    println!("\n--- Guardando subtítulos en un archivo ---");
-    service.write_all(output_filename, &subtitles)?;
-    println!("Subtítulos guardados en {}", output_filepath);
+	// 2. Crear un subtítulo mediante código.
+	index, err := subtitle.NewSubtitleIndex(3)
+	if err != nil {
+		log.Fatal(err)
+	}
+	start, err := subtitle.NewSubtitleTimestamp(7000 * time.Millisecond)
+	if err != nil {
+		log.Fatal(err)
+	}
+	end, err := subtitle.NewSubtitleTimestamp(8000 * time.Millisecond)
+	if err != nil {
+		log.Fatal(err)
+	}
+	text, err := subtitle.NewSubtitleText("This is a new subtitle, created in code.")
+	if err != nil {
+		log.Fatal(err)
+	}
+	newSubtitle, err := subtitle.NewSubtitle(index, start, end, text)
+	if err != nil {
+		log.Fatal(err)
+	}
+	subtitles = append(subtitles, newSubtitle)
 
-    // Verificar el contenido del archivo de salida
-    let output_content = fs::read_to_string(&output_filepath)?;
-    println!("\n--- Contenido de {} ---", output_filename);
-    println!("{}", output_content.trim());
-    println!("---");
-
-    // Limpiar los archivos creados
-    fs::remove_file(&sample_filepath)?;
-    fs::remove_file(&output_filepath)?;
-    println!("\nArchivos temporales eliminados.");
-
-    Ok(())
+	// 3. Guardar la lista modificada en un archivo nuevo.
+	if err := service.WriteAll("output.srt", subtitles); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Subtitles saved to output.srt")
 }
 ```
 
 ### Explicación paso a paso
 
 1. **Instanciar `SubRipService`**:
-   `SubRipService` necesita un directorio base. Todos los nombres de archivo que proporcione serán relativos a esta ruta.
+   El servicio necesita un directorio base. Todos los nombres de archivo que proporcione se resuelven en relación con esta ruta.
 
-   ```rust
-   use lib::subtitle::service::SubRipService;
-   let service = SubRipService::new("examples");
+   ```go
+   service := subtitle.NewSubRipService(baseDir)
    ```
 
 2. **Leer subtítulos**:
-   El método `get_all` lee un archivo .srt y devuelve un `Vec<Subtitle>` si tiene éxito.
+   `GetAll` lee un archivo .srt y devuelve un `[]subtitle.Subtitle`.
 
-   ```rust
-   let subtitles = service.get_all("sample.srt")?;
+   ```go
+   subtitles, err := service.GetAll("sample.srt")
    ```
 
-3. **Crear un nuevo subtítulo**:
-   Puede crear nuevas instancias de `Subtitle` programáticamente. La biblioteca usa `nutype` para garantizar que todos los datos sean válidos (por ejemplo, los índices deben ser positivos, el texto no puede estar vacío).
+3. **Crear un subtítulo nuevo**:
+   Construya un `Subtitle` a partir de tipos de valor validados. Cada constructor `New…` devuelve un `error` cuando la entrada no es válida (los índices deben ser positivos, el texto no puede estar vacío, el fin debe ser posterior al inicio).
 
-   ```rust
-   use chrono::Duration;
-   use lib::subtitle::model::{Subtitle, SubtitleIndex, SubtitleText, SubtitleTimestamp};
-
-   let new_subtitle = Subtitle::new(
-       SubtitleIndex::try_new(3)?,
-       SubtitleTimestamp::try_new(Duration::milliseconds(7000))?,
-       SubtitleTimestamp::try_new(Duration::milliseconds(8000))?,
-       SubtitleText::try_new("This is a new subtitle, created in code.".to_string())?,
-   )?;
+   ```go
+   index, err := subtitle.NewSubtitleIndex(3)
+   start, err := subtitle.NewSubtitleTimestamp(7000 * time.Millisecond)
+   end, err := subtitle.NewSubtitleTimestamp(8000 * time.Millisecond)
+   text, err := subtitle.NewSubtitleText("This is a new subtitle, created in code.")
+   newSubtitle, err := subtitle.NewSubtitle(index, start, end, text)
    ```
 
 4. **Escribir subtítulos**:
-   El método `write_all` toma un slice de `Subtitle`s y los escribe en un archivo, sobreescribiéndolo si ya existe.
+   `WriteAll` toma un slice de `Subtitle` y los escribe en un archivo, sobrescribiéndolo si ya existe.
 
-   ```rust
-   service.write_all("output.srt", &subtitles)?;
+   ```go
+   err := service.WriteAll("output.srt", subtitles)
    ```
 
 ## Exploración adicional
 
-Para usos más avanzados, puede explorar otros métodos disponibles en el trait `SubtitleService`, como:
+Para un uso más avanzado, explore los demás métodos de la interfaz `subtitle.Service`:
 
-- `get_by_id`: Recuperar un único subtítulo por su índice.
-- `set`: Actualizar un subtítulo existente.
-- `add`: Añadir un nuevo subtítulo a un archivo.
+- `GetByID(filename, id)` — obtener un único subtítulo por su índice (devuelve `(nil, nil)` cuando no se encuentra).
+- `Set(filename, id, update)` — actualizar un subtítulo existente.
+- `Add(filename, start, end, text)` — añadir un nuevo subtítulo a un archivo.
 
-Puede encontrar información más detallada en la documentación del código fuente.
+Además de `pkg/subtitle`, los demás paquetes de la biblioteca cubren el resto de las funciones del conjunto de herramientas:
+
+| Paquete | Propósito |
+|---|---|
+| `pkg/subtitle` | Modelo de dominio principal, lectura/escritura de SRT (`SubRipService`) |
+| `pkg/backup` | Copias de seguridad de archivos con marca de tiempo (`SubRipBackupService`) |
+| `pkg/doctor` | Diagnosticar y reparar archivos SRT con errores |
+| `pkg/importer` | Importar subtítulos desde formatos CSV y anclado |
+| `pkg/rename` | Renombrado masivo de archivos de subtítulos basado en plantillas |
+| `pkg/verify` | Comparar dos archivos en busca de discrepancias de índice/marca de tiempo (`CompareSubtitles`) |
+| `pkg/translationstatus` | Progreso de traducción respecto a una referencia (`CheckTranslationStatus`) |
+
+## Nota sobre el registro (logging)
+
+La biblioteca registra mensajes a través del paquete estándar `log/slog`. De forma predeterminada, `slog` de Go escribe registros de nivel `Info` en stderr, por lo que puede ver líneas de registro al llamar a las funciones de la biblioteca. Para controlarlas o silenciarlas, instale su propio handler predeterminado, por ejemplo:
+
+```go
+import "log/slog"
+
+// Mostrar solo advertencias y niveles superiores.
+slog.SetLogLoggerLevel(slog.LevelWarn)
+```

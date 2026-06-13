@@ -1,62 +1,87 @@
-version := `cat Cargo.toml | grep version | head -1 | cut -d " " -f 3 | tr -d "\""`
+version := `cat VERSION`
+imageName := 'tinyops/submarine'
 
-init:
-  cargo install cargo-llvm-cov
+# ldflags injecting the version from the VERSION file into main.version
+ldflags := '-X main.version=' + version
 
-run-examples:
-  @echo "Running example: simple"
-  @cargo run --example simple
-  @echo "Running example: subtitle_usage"
-  @cargo run --example subtitle_usage
+# Always produce static binaries on every platform (no libc/cgo linkage).
+# Exported so every recipe — build, test, run, release — inherits it.
+export CGO_ENABLED := '0'
 
-lint:
-    cargo fmt -- --check
-    cargo clippy -- -D warnings
+# Install git hooks (run gofmt + go vet on every commit)
+install-hooks:
+    git config core.hooksPath .githooks
+    @echo "git hooks installed (.githooks)"
 
-build: lint
-  cargo build --bin sm
+# Remove build artifacts
+cleanup:
+    rm -f sm coverage.out coverage.html
 
-test:
-  cargo test --bin sm
-  cargo test --lib
+# Upgrade dependencies and tidy go.mod
+bump-deps:
+    go get -u ./...
+    go mod tidy
 
+# Build the sm binary
+build: format
+    go build -ldflags="{{ ldflags }}" -o sm ./cmd/sm
+
+# Check formatting and run go vet
+lint: format
+    test -z "$(gofmt -l cmd internal pkg examples)"
+    go vet ./...
+
+# Run all tests, or focus on a pattern: `just test TestParseTimestamp`
+test pattern="":
+    #!/usr/bin/env sh
+    if [ -n "{{ pattern }}" ]; then go test ./... -run "{{ pattern }}" -v; else go test ./...; fi
+
+# Run the full test suite
 test-all:
-  cargo test --bin sm
-  cargo test --lib
-  # Integration tests
-  cargo test --test '*'
+    go test ./...
 
-# Run tests with coverage report (HTML output)
+# Run tests with an HTML coverage report
 coverage:
-  cargo llvm-cov --all-features --workspace --html
+    go test ./... -coverprofile=coverage.out
+    go tool cover -func=coverage.out
+    go tool cover -html=coverage.out -o coverage.html
+    @echo "coverage report generated at coverage.html"
 
-# Run tests with coverage report (terminal output)
-coverage-text:
-  cargo llvm-cov --all-features --workspace
-
-# Run tests with coverage and open HTML report in browser
-coverage-open:
-  cargo llvm-cov --all-features --workspace --open
-
-# Clean coverage artifacts
+# Remove coverage artifacts
 coverage-clean:
-  cargo llvm-cov clean --workspace
+    rm -f coverage.out coverage.html
 
-release-linux: test-all && lint
-  rm -f sm
-  rm -rf out
-  mkdir -p out
-  docker build --progress=plain --platform=linux/amd64 -t submarine .
-  docker create --name submarine-temp submarine
-  docker cp submarine-temp:/sm out/sm
-  docker rm submarine-temp
-  cp out/sm .
-  chmod +x sm
-  zip -9 -r sm-{{version}}-linux-amd64.zip sm
-  rm -f sm
+# Format the code
+format:
+    go fmt ./...
 
-release-macos: test-all && lint
-  cargo build --release --bin sm
-  cp target/release/sm sm
-  zip -9 -r sm-{{version}}-macos-arm64.zip sm
-  rm -f sm
+# Run the CLI: `just run get test-data/valid/complex.srt 1`
+run *args:
+    go run ./cmd/sm {{ args }}
+
+# Build the Docker image
+build-image: test && lint
+    docker build --progress=plain --platform linux/amd64 --build-arg VERSION={{ version }} \
+        -t {{ imageName }}:{{ version }} -t {{ imageName }}:latest .
+
+# Push the Docker image
+push-image:
+    docker push {{ imageName }}:{{ version }}
+    docker push {{ imageName }}:latest
+
+# Build and push the Docker image
+release-image: build-image && push-image
+
+# Build a compressed linux/amd64 release archive
+release-linux: test && lint
+    just cleanup
+    GOOS=linux GOARCH=amd64 go build -ldflags="-w -s {{ ldflags }}" -o sm ./cmd/sm
+    zip -9 sm-{{ version }}-linux-amd64.zip sm
+    rm -f sm
+
+# Build a compressed macos/arm64 release archive
+release-macos: test && lint
+    just cleanup
+    GOOS=darwin GOARCH=arm64 go build -ldflags="-w -s {{ ldflags }}" -o sm ./cmd/sm
+    zip -9 sm-{{ version }}-macos-arm64.zip sm
+    rm -f sm

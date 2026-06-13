@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Running pre-commit checks..."
+
+# 1. Formatting check (gofmt, check-only — does not modify files)
+echo "Checking formatting with gofmt..."
+unformatted="$(gofmt -l cmd internal pkg examples)"
+if [ -n "$unformatted" ]; then
+    echo "gofmt found unformatted files:"
+    echo "$unformatted"
+    echo "Run 'just format' to fix."
+    exit 1
+fi
+
+# 2. Linter (go vet)
+echo "Running go vet..."
+if ! go vet ./...; then
+    echo "go vet found issues. Please fix them."
+    exit 1
+fi
+
+echo "All checks passed!"
+exit 0
