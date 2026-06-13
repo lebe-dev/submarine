@@ -85,3 +85,5 @@ release-macos: test && lint
     GOOS=darwin GOARCH=arm64 go build -ldflags="-w -s {{ ldflags }}" -o sm ./cmd/sm
     zip -9 sm-{{ version }}-macos-arm64.zip sm
     rm -f sm
+
+release: release-linux release-macos release-image
