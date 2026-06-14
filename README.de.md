@@ -10,6 +10,7 @@ Submarine ist ein Toolkit zur LLM-gestützten Übersetzung von Untertiteln.
 
 Ich schaue Filme, Cartoons und Anime am liebsten im Original. Untertitel in meiner Sprache sind jedoch oft nicht verfügbar. LLMs ermöglichen zwar die Übersetzung von Untertiteln, sind aber nicht fehlerfrei — manchmal verwechseln sie Nummerierungen oder Zeitstempel. Selbst die besten Modelle scheitern regelmäßig.
 
+Neben fehlenden Untertiteln können diese auch unvollständig sein oder Kompatibilitätsprobleme mit verschiedenen Releases haben.
 Submarine unterstützt den Übersetzungsprozess durch verschiedene Bearbeitungs- und Validierungswerkzeuge. So wird sichergestellt, dass übersetzte Untertitel korrekt und konsistent mit dem Original sind.
 
 ## Funktionen
@@ -41,130 +42,11 @@ Submarine unterstützt den Übersetzungsprozess durch verschiedene Bearbeitungs-
 
 macOS (Homebrew), Linux, Docker — siehe [docs/install/](docs/install/README.de.md).
 
-## Verwendung
-
-```bash
-# Informationen zur Untertiteldatei anzeigen
-# sm info [FILE.srt]
-$ sm info Resident.Alien.S01E01.srt
-
-# Untertitel nach Index oder Bereich abrufen
-# sm get [FILE.srt] [INDEX or RANGE]
-$ sm get Resident.Alien.S01E01.srt 123
-
-123
-00:06:54,111 --> 00:06:56,111
-First subtitle
-
-# Bereichssyntax wird ebenfalls unterstützt
-$ sm get Resident.Alien.S01E01.srt 123-124
-
-123
-00:06:54,111 --> 00:06:56,111
-First subtitle
-
-124
-00:06:56,111 --> 00:06:57,678
-Second subtitle
-
-# Untertitel für einen Index setzen
-# sm set [--dry-run] [FILE.srt] [INDEX] \
-#       [--start=00:00:03,481] \
-#       [--end=00:00:04,481] \
-#       [--text "TEXT"]
-$ sm set Resident.Alien.S01E01.srt 123 \
-       --text "Okay"
-
-# Vorschau der Änderungen ohne Dateiänderung
-$ sm set --dry-run Resident.Alien.S01E01.srt 123 --text "Okay"
-
-# Untertitel am Ende der Datei hinzufügen
-# Erhöht den Index automatisch und erstellt ein Backup
-# Erstellt die srt-Datei, falls sie nicht existiert
-# sm add [--dry-run] [FILE.srt] [START-END-TIMESTAMP] "[NEW-SUBTITLE]"
-$ sm add Resident.Alien.S01E01.srt "00:03:03,481-00:03:04,481" "Okay"
-
-# Zeitstempel um einen Versatz verschieben
-# Unterstützt positive und negative Werte in Millisekunden
-# sm delay [--dry-run] [FILE.srt] [OFFSET]
-$ sm delay Resident.Alien.S01E01.srt "+1000"  # 1 Sekunde addieren
-$ sm delay Resident.Alien.S01E01.srt "-500"   # 0,5 Sekunden subtrahieren
-
-# Untertitel aus einer CSV-Datei importieren
-# Erstellt die srt-Datei, falls sie nicht existiert
-# sm import [--dry-run] [--format=csv,anchored] [--force] [FILE.srt] [IMPORT.csv]
-$ sm import --format=csv Resident.Alien.S01E01.srt import.csv
-$ sm import --format=anchored Resident.Alien.S01E01.srt import.txt
-
-# Dateiintegrität prüfen
-# sm doctor [--fix] [FILE.srt]
-sm doctor --fix Resident.Alien.S01E01.eng.srt
-
-# Stapelumbenennung
-# - file-mask ist nicht zwischen Groß- und Kleinschreibung
-# sm mass-rename [--dry-run] [--force] [--name="Resident Alien"] \
-#          [--series-mode] [--season=3] \
-#          [--language="rus"] \
-#          [--separator="."] \
-#          [--file-template="{{ name }}{{ separator }}S{{ season }}{{ separator }}E{{ episode }}.srt"] \
-#          [FILE-MASK]
-$ sm mass-rename --dry-run \
-          --name="Resident Alien" \
-          --series-mode --season=3 \
-          --separator="." \
-          "Resident"
-
-# Untertitel im interaktiven Modus vergleichen
-# sm compare [FILE1.srt] [FILE2.srt]
-$ sm compare Resident.Alien.S01E01.eng.srt Resident.Alien.S01E01.rus.srt
-
-# Untertiteldateien prüfen
-# sm verify [--range=1-50] [REFERENCE-FILE] [FILE2]
-$ sm verify Resident.Alien.S01E01.eng.srt Resident.Alien.S01E01.rus.srt
-$ sm verify --range=1-50 Resident.Alien.S01E01.eng.srt Resident.Alien.S01E01.rus.srt
-
-Ergebnisse
-==================
-
-Matched: 874/876 (99.8%)
-Missing in Resident.Alien.S01E01.rus.srt: 2
-Index offset detected: -2
-Missing subtitles:
-  [848] 00:41:39,497 --> 00:41:42,325 (not found in Resident.Alien.S01E01.rus.srt)
-  [...] ...
-
-# Übersetzungsfortschritt anzeigen
-# sm ts --reference [REFERENCE-FILE] [FILE2]
-$ sm ts --reference Resident.Alien.S03E08.eng.srt Resident.Alien.S03E08.rus.srt
-Progress: 873/876 (99.7%)
-Next chunk: 474-523
-
-# Untertitel im angegebenen Format exportieren
-# sm export [--format=anchored] [FILE.srt] [RANGE]
-$ sm export --format=anchored movie.eng.srt 1-50
-
-[1] Hello, how are you?
-[2] I'm fine, thanks.
-[3] Good to hear.
-...
-[50] See you tomorrow.
-
-# JSON-Ausgabe (für alle Befehle außer compare)
-$ sm get Resident.Alien.S01E01.srt 1 --output json
-{"ok":true,"data":{"index":1,"start_time":"00:00:01,436",...}}
-
-$ sm info Resident.Alien.S01E01.srt --output json
-
-# Verfügbare Befehle und ihre Schemas anzeigen
-$ sm describe
-$ sm describe get
-```
-
 ## Anwendungsfälle
 
 Aufgabenorientierte Rezepte für häufige Untertitelprobleme — Synchronisierung, Zusammenführen,
-Vergleichen und Bereinigen — mit kopierfertigen Befehlen und erwartetem Ausgabe. Den vollständigen
-Index finden Sie unter [docs/usecases/](docs/usecases/README.de.md), darunter:
+Vergleichen und Bereinigen — mit kopierfertigen Befehlen und erwartetem Ausgabe. Vollständiger Index —
+[docs/usecases/](docs/usecases/README.de.md), darunter:
 
 - [Unvollständige Übersetzung mit einer Spenderdatei zusammenführen](docs/usecases/merge-incomplete-translation-with-donor.de.md)
 - [Konstanten Sync-Versatz erkennen und beheben](docs/usecases/detect-and-fix-constant-offset.de.md)
