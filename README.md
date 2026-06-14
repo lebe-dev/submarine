@@ -203,6 +203,16 @@ $ sm describe
 $ sm describe get
 ```
 
+## Use cases
+
+Task-oriented recipes for real subtitle problems — syncing, merging, comparing, and
+cleaning up — with copy-paste commands and expected output. See
+[docs/usecases/](docs/usecases/README.md) for the full index, including:
+
+- [Merge an incomplete translation with a donor file](docs/usecases/merge-incomplete-translation-with-donor.md)
+- [Detect and fix a constant sync offset](docs/usecases/detect-and-fix-constant-offset.md)
+- [Fix frame-rate drift (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.md)
+
 ## How to use as library
 
 In addition to its command-line interface, Submarine can be used as a library in your own Rust projects. For detailed information on how to integrate it, please see the [library documentation](docs/LIBRARY.md).

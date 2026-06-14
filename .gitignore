@@ -11,5 +11,5 @@
 /*.srt
 /backups
 .DS_Store
-!/docs/*.md
+!/docs/**/*.md
 /sm
