@@ -1,6 +1,6 @@
 # Submarine
 
-Submarine — небольшой набор инструментов для помощи в переводе субтитров с использованием LLM.
+Submarine — набор инструментов для перевода субтитров с помощью LLM.
 
 ![Логотип Submarine](logo.png)
 
@@ -14,10 +14,10 @@ Submarine помогает в процессе перевода, предост�
 
 ## Возможности
 
-- Формат субтитров: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
+- Поддерживаемый формат: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
 - Поддерживаемые сценарии работы:
-  - Агент: [docs/AGENT-TRANSLATION-FLOW.RU.md](docs/AGENT-TRANSLATION-FLOW.RU.md)
-  - Чат-бот: [docs/CHATBOT-TRANSLATION-FLOW.RU.md](docs/CHATBOT-TRANSLATION-FLOW.RU.md)
+  - [Агент](docs/AGENT-TRANSLATION-FLOW.RU.md) (Рекомендуется)
+  - [Чат-бот](docs/CHATBOT-TRANSLATION-FLOW.RU.md)
 - **Инструменты:**
   - Получить субтитр по индексу или диапазону
   - Добавить новый субтитр

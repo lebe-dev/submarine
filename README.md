@@ -1,6 +1,6 @@
 # Submarine
 
-Submarine is a tiny toolkit for LLM translation assistance.
+Submarine is a toolkit for subtitles translation with LLM assistance.
 
 ![Submarine Toolkit Logo](logo.png)
 
@@ -14,10 +14,10 @@ Submarine is designed to assist the translation process by providing various edi
 
 ## Features
 
-- Subtitles format: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
+- Supported format: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
 - Supported flows:
-  - Agent: [docs/AGENT-TRANSLATION-FLOW.md](docs/AGENT-TRANSLATION-FLOW.md)
-  - Chatbot: [docs/CHATBOT-TRANSLATION-FLOW.md](docs/CHATBOT-TRANSLATION-FLOW.md)
+  - [Agent](docs/AGENT-TRANSLATION-FLOW.md) (Recommended)
+  - [Chatbot](docs/CHATBOT-TRANSLATION-FLOW.md)
 - **Toolset:**
   - Get subtitle by index or range
   - Add a new subtitle
