@@ -61,8 +61,3 @@ Vergleichen und Bereinigen — mit kopierfertigen Befehlen und erwartetem Ausgab
 ## Als Bibliothek verwenden
 
 Neben der Befehlszeilenschnittstelle kann Submarine als Bibliothek in eigenen Rust-Projekten verwendet werden. Weitere Informationen zur Integration finden Sie in der [Bibliotheksdokumentation](docs/LIBRARY.md).
-
-## Roadmap
-
-- Feature: Synchronisierung
-- Feature: Zusammenführen

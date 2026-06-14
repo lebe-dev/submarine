@@ -61,8 +61,3 @@ cleaning up — with copy-paste commands and expected output. Full index —
 ## How to use as library
 
 In addition to its command-line interface, Submarine can be used as a library in your own Rust projects. For detailed information on how to integrate it, please see the [library documentation](docs/LIBRARY.md).
-
-## RoadMap
-
-- Feature: sync
-- Feature: merge

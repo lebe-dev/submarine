@@ -61,8 +61,3 @@ y limpieza — con comandos listos para copiar y salida esperada. Índice comple
 ## Uso como biblioteca
 
 Además de la interfaz de línea de comandos, Submarine puede usarse como biblioteca en proyectos Rust propios. Para más detalles sobre la integración, consulte la [documentación de la biblioteca](docs/LIBRARY.md).
-
-## Hoja de ruta
-
-- Feature: sincronización
-- Feature: fusión
