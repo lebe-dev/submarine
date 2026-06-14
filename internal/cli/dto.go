@@ -179,6 +179,9 @@ type DelayResultDto struct {
 	DryRun            bool          `json:"dry_run,omitempty"`
 	SampleBefore      []SubtitleDto `json:"sample_before,omitempty"`
 	SampleAfter       []SubtitleDto `json:"sample_after,omitempty"`
+	RangeStart        *uint32       `json:"range_start,omitempty"`
+	RangeEnd          *uint32       `json:"range_end,omitempty"`
+	FromTimestamp     *string       `json:"from_timestamp,omitempty"`
 }
 
 // MassRenameResultDto is a port of the Rust `struct MassRenameResultDto`.
@@ -255,4 +258,113 @@ func FormatDurationReadable(duration time.Duration) string {
 	default:
 		return fmt.Sprintf("%dms", milliseconds)
 	}
+}
+
+// -- Merge DTO --
+
+// MergeResultDto is the DTO for the merge command result.
+type MergeResultDto struct {
+	BaseCount          int    `json:"base_count"`
+	DonorCount         int    `json:"donor_count"`
+	Added              int    `json:"added"`
+	SkippedOverlapping int    `json:"skipped_overlapping"`
+	Replaced           int    `json:"replaced"`
+	AppliedOffsetMs    int64  `json:"applied_offset_ms"`
+	TotalCount         int    `json:"total_count"`
+	Output             string `json:"output"`
+	DryRun             bool   `json:"dry_run,omitempty"`
+}
+
+// -- Detect Offset DTO --
+
+// DetectOffsetDto is the DTO for the detect-offset command result.
+type DetectOffsetDto struct {
+	AnchorMatches  int   `json:"anchor_matches"`
+	MedianOffsetMs int64 `json:"median_offset_ms"`
+	StddevMs       int64 `json:"stddev_ms"`
+	DriftDetected  bool  `json:"drift_detected"`
+	SameVideo      bool  `json:"same_video"`
+}
+
+// -- Diff DTO --
+
+// DiffResultDto is the DTO for the diff command result.
+type DiffResultDto struct {
+	AFile       string        `json:"a_file"`
+	BFile       string        `json:"b_file"`
+	By          string        `json:"by"`
+	ToleranceMs int64         `json:"tolerance_ms"`
+	OnlyInA     []SubtitleDto `json:"only_in_a"`
+	OnlyInB     []SubtitleDto `json:"only_in_b"`
+	CommonCount int           `json:"common_count"`
+}
+
+// -- Gaps DTOs --
+
+// GapDto is the DTO for a single gap between subtitles.
+type GapDto struct {
+	AfterIndex uint32 `json:"after_index"`
+	Start      string `json:"start"`
+	End        string `json:"end"`
+	DurationMs int64  `json:"duration_ms"`
+}
+
+// GapsResultDto is the DTO for the gaps command result.
+type GapsResultDto struct {
+	File     string   `json:"file"`
+	MinGapMs int64    `json:"min_gap_ms"`
+	Count    int      `json:"count"`
+	Gaps     []GapDto `json:"gaps"`
+}
+
+// -- Normalize DTO --
+
+// NormalizeResultDto is the DTO for the normalize command result.
+type NormalizeResultDto struct {
+	File          string `json:"file"`
+	TotalCount    int    `json:"total_count"`
+	Sorted        bool   `json:"sorted"`
+	Renumbered    bool   `json:"renumbered"`
+	OverlapsFixed int    `json:"overlaps_fixed"`
+	BackupPath    string `json:"backup_path"`
+	DryRun        bool   `json:"dry_run,omitempty"`
+}
+
+// -- Rescale DTO --
+
+// RescaleResultDto is the DTO for the rescale command result.
+type RescaleResultDto struct {
+	File       string     `json:"file"`
+	Mode       string     `json:"mode"`
+	Factor     Percentage `json:"factor"`
+	OffsetMs   int64      `json:"offset_ms"`
+	TotalCount int        `json:"total_count"`
+	Output     string     `json:"output"`
+	BackupPath string     `json:"backup_path"`
+	DryRun     bool       `json:"dry_run,omitempty"`
+}
+
+// -- Concat DTO --
+
+// ConcatResultDto is the DTO for the concat command result.
+type ConcatResultDto struct {
+	Parts      int    `json:"parts"`
+	GapMs      int64  `json:"gap_ms"`
+	TotalCount int    `json:"total_count"`
+	Output     string `json:"output"`
+	DryRun     bool   `json:"dry_run,omitempty"`
+}
+
+// -- Dedupe DTO --
+
+// DedupeResultDto is the DTO for the dedupe command result.
+type DedupeResultDto struct {
+	File            string `json:"file"`
+	OriginalCount   int    `json:"original_count"`
+	Removed         int    `json:"removed"`
+	Merged          int    `json:"merged"`
+	FinalCount      int    `json:"final_count"`
+	TimeToleranceMs int64  `json:"time_tolerance_ms"`
+	BackupPath      string `json:"backup_path"`
+	DryRun          bool   `json:"dry_run,omitempty"`
 }

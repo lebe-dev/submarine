@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/lebe-dev/submarine/internal/cli"
 	"github.com/lebe-dev/submarine/internal/cli/cmd"
@@ -40,6 +41,63 @@ func optStr(c *ucli.Command, name string) *string {
 	return &v
 }
 
+// delayArgs holds delay's resolved positional values and option flags.
+type delayArgs struct {
+	file     string
+	offset   string
+	rangeVal *string
+	fromTs   *string
+	dryRun   bool
+}
+
+// scanDelayLeakedTokens reconstructs delay's arguments independent of token
+// order. A negative offset like "-500" looks like a flag, so urfave halts flag
+// parsing when it sees one: any --dry-run / --range / --from-timestamp placed
+// AFTER the offset then leaks into the positional args instead of being
+// applied. We re-scan those leaked tokens here so "delay file -500 --dry-run"
+// behaves the same as "delay --dry-run file -500". Flags placed before the
+// offset are already parsed by urfave and arrive via base.
+func scanDelayLeakedTokens(rawArgs []string, base delayArgs) delayArgs {
+	out := base
+	for i := 0; i < len(rawArgs); i++ {
+		arg := rawArgs[i]
+		switch {
+		case arg == "--dry-run":
+			out.dryRun = true
+		case arg == "--range" && i+1 < len(rawArgs):
+			i++
+			v := rawArgs[i]
+			out.rangeVal = &v
+		case strings.HasPrefix(arg, "--range="):
+			v := strings.TrimPrefix(arg, "--range=")
+			out.rangeVal = &v
+		case arg == "--from-timestamp" && i+1 < len(rawArgs):
+			i++
+			v := rawArgs[i]
+			out.fromTs = &v
+		case strings.HasPrefix(arg, "--from-timestamp="):
+			v := strings.TrimPrefix(arg, "--from-timestamp=")
+			out.fromTs = &v
+		case out.file == "":
+			out.file = arg
+		case out.offset == "":
+			out.offset = arg
+		}
+	}
+	return out
+}
+
+// parseDelayArgs resolves delay's positional and flag values from the urfave
+// command, tolerating flags placed after a negative offset.
+func parseDelayArgs(c *ucli.Command) delayArgs {
+	base := delayArgs{
+		rangeVal: optStr(c, "range"),
+		fromTs:   optStr(c, "from-timestamp"),
+		dryRun:   c.Bool("dry-run"),
+	}
+	return scanDelayLeakedTokens(c.Args().Slice(), base)
+}
+
 // optUint32 returns a pointer to the uint32 flag value when set, or nil.
 // Equivalent of clap's `Option<u32>`.
 func optUint32(c *ucli.Command, name string) *uint32 {
@@ -47,6 +105,16 @@ func optUint32(c *ucli.Command, name string) *uint32 {
 		return nil
 	}
 	v := c.Uint32(name)
+	return &v
+}
+
+// optFloat64 returns a pointer to the float64 flag value when set, or nil.
+// Equivalent of clap's `Option<f64>`.
+func optFloat64(c *ucli.Command, name string) *float64 {
+	if !c.IsSet(name) {
+		return nil
+	}
+	v := c.Float(name)
 	return &v
 }
 
@@ -353,17 +421,149 @@ func buildCommands() []*ucli.Command {
 			Usage:     "Adjust subtitle timestamps by specified milliseconds offset",
 			ArgsUsage: "<FILE> <OFFSET>",
 			Flags: []ucli.Flag{
+				&ucli.StringFlag{Name: "range", Usage: "START-END index range"},
+				&ucli.StringFlag{Name: "from-timestamp", Usage: "HH:MM:SS,mmm"},
+				&ucli.BoolFlag{Name: "dry-run", Usage: "Preview changes without modifying the file"},
+			},
+			Action: func(_ context.Context, c *ucli.Command) error {
+				format := resolveOutputFormat(c)
+				// OFFSET is allow_hyphen_values in clap: "-500" / "+100" are
+				// positional values. A negative offset halts urfave's flag
+				// parsing, so parseDelayArgs recovers any flags placed after it.
+				d := parseDelayArgs(c)
+				return cmd.HandleDelay(d.file, d.offset, d.rangeVal, d.fromTs, d.dryRun, format)
+			},
+		},
+		// Merge a donor SRT into a base SRT
+		{
+			Name:      "merge",
+			Usage:     "Merge a donor SRT into a base SRT",
+			ArgsUsage: "<BASE.srt> <DONOR.srt>",
+			Flags: []ucli.Flag{
+				&ucli.StringFlag{Name: "out", Usage: "Output file path", Required: true},
+				&ucli.StringFlag{Name: "strategy", Usage: "keep-base|prefer-donor|fill-gaps", Value: "fill-gaps"},
+				&ucli.IntFlag{Name: "overlap-tolerance", Usage: "Overlap tolerance in ms", Value: 250},
+				&ucli.IntFlag{Name: "offset", Usage: "donor shift in ms; pass as --offset=-212 for negatives", Value: 0},
+				&ucli.BoolFlag{Name: "auto-offset", Usage: "Auto-detect donor offset"},
+				&ucli.BoolFlag{Name: "dry-run", Usage: "Preview changes without modifying the file"},
+			},
+			Action: func(_ context.Context, c *ucli.Command) error {
+				format := resolveOutputFormat(c)
+				base := c.Args().Get(0)
+				donor := c.Args().Get(1)
+				return cmd.HandleMerge(base, donor, c.String("out"), c.String("strategy"), int64(c.Int("overlap-tolerance")), int64(c.Int("offset")), c.Bool("auto-offset"), c.Bool("dry-run"), format)
+			},
+		},
+		// Detect the time offset between two SRT files
+		{
+			Name:      "detect-offset",
+			Usage:     "Detect the time offset between two SRT files",
+			ArgsUsage: "<A.srt> <B.srt>",
+			Action: func(_ context.Context, c *ucli.Command) error {
+				format := resolveOutputFormat(c)
+				a := c.Args().Get(0)
+				b := c.Args().Get(1)
+				return cmd.HandleDetectOffset(a, b, format)
+			},
+		},
+		// Diff two SRT files by time or text
+		{
+			Name:      "diff",
+			Usage:     "Diff two SRT files by time or text",
+			ArgsUsage: "<A.srt> <B.srt>",
+			Flags: []ucli.Flag{
+				&ucli.StringFlag{Name: "by", Usage: "time|text", Value: "time"},
+				&ucli.IntFlag{Name: "tolerance", Usage: "Time tolerance in ms", Value: 250},
+			},
+			Action: func(_ context.Context, c *ucli.Command) error {
+				format := resolveOutputFormat(c)
+				a := c.Args().Get(0)
+				b := c.Args().Get(1)
+				return cmd.HandleDiff(a, b, c.String("by"), int64(c.Int("tolerance")), format)
+			},
+		},
+		// Report gaps between subtitles in an SRT file
+		{
+			Name:      "gaps",
+			Usage:     "Report gaps between subtitles in an SRT file",
+			ArgsUsage: "<FILE>",
+			Flags: []ucli.Flag{
+				&ucli.IntFlag{Name: "min-gap", Usage: "Minimum gap in ms", Value: 1000},
+			},
+			Action: func(_ context.Context, c *ucli.Command) error {
+				format := resolveOutputFormat(c)
+				file := c.Args().Get(0)
+				return cmd.HandleGaps(file, int64(c.Int("min-gap")), format)
+			},
+		},
+		// Normalize an SRT file (sort, renumber, fix overlaps)
+		{
+			Name:      "normalize",
+			Usage:     "Normalize an SRT file (sort, renumber, fix overlaps)",
+			ArgsUsage: "<FILE>",
+			Flags: []ucli.Flag{
+				&ucli.BoolFlag{Name: "sort", Usage: "Sort subtitles by start time", Value: true},
+				&ucli.BoolFlag{Name: "renumber", Usage: "Renumber subtitle indices", Value: true},
+				&ucli.BoolFlag{Name: "fix-overlaps", Usage: "Fix overlapping subtitles"},
 				&ucli.BoolFlag{Name: "dry-run", Usage: "Preview changes without modifying the file"},
 			},
 			Action: func(_ context.Context, c *ucli.Command) error {
 				format := resolveOutputFormat(c)
 				file := c.Args().Get(0)
-				// OFFSET is allow_hyphen_values in clap: "-500" / "+100" are
-				// positional values. urfave stops flag parsing at a "-<digit>"
-				// token, so it lands in Args().
-				offset := c.Args().Get(1)
-				dryRun := c.Bool("dry-run")
-				return cmd.HandleDelay(file, offset, dryRun, format)
+				return cmd.HandleNormalize(file, c.Bool("sort"), c.Bool("renumber"), c.Bool("fix-overlaps"), c.Bool("dry-run"), format)
+			},
+		},
+		// Rescale subtitle timestamps by factor, fps, or anchors
+		{
+			Name:      "rescale",
+			Usage:     "Rescale subtitle timestamps by factor, fps, or anchors",
+			ArgsUsage: "<FILE>",
+			// Anchor values are "IDX=HH:MM:SS,mmm" — the comma in the timestamp
+			// must not be treated as a slice separator, or the anchor never parses.
+			DisableSliceFlagSeparator: true,
+			Flags: []ucli.Flag{
+				&ucli.StringFlag{Name: "out", Usage: "Output file path", Required: true},
+				&ucli.FloatFlag{Name: "factor", Usage: "Scale factor"},
+				&ucli.FloatFlag{Name: "from-fps", Usage: "Source frame rate"},
+				&ucli.FloatFlag{Name: "to-fps", Usage: "Target frame rate"},
+				&ucli.StringSliceFlag{Name: "anchor", Usage: "IDX=HH:MM:SS,mmm (give twice)"},
+				&ucli.BoolFlag{Name: "dry-run", Usage: "Preview changes without modifying the file"},
+			},
+			Action: func(_ context.Context, c *ucli.Command) error {
+				format := resolveOutputFormat(c)
+				file := c.Args().Get(0)
+				return cmd.HandleRescale(file, c.String("out"), optFloat64(c, "factor"), optFloat64(c, "from-fps"), optFloat64(c, "to-fps"), c.StringSlice("anchor"), c.Bool("dry-run"), format)
+			},
+		},
+		// Concatenate multiple SRT files into one
+		{
+			Name:      "concat",
+			Usage:     "Concatenate multiple SRT files into one",
+			ArgsUsage: "<PART1.srt> <PART2.srt> [...]",
+			Flags: []ucli.Flag{
+				&ucli.StringFlag{Name: "out", Usage: "Output file path", Required: true},
+				&ucli.IntFlag{Name: "gap", Usage: "Gap in ms between parts", Value: 0},
+				&ucli.BoolFlag{Name: "dry-run", Usage: "Preview changes without modifying the file"},
+			},
+			Action: func(_ context.Context, c *ucli.Command) error {
+				format := resolveOutputFormat(c)
+				return cmd.HandleConcat(c.Args().Slice(), c.String("out"), int64(c.Int("gap")), c.Bool("dry-run"), format)
+			},
+		},
+		// Remove duplicate subtitles from an SRT file
+		{
+			Name:      "dedupe",
+			Usage:     "Remove duplicate subtitles from an SRT file",
+			ArgsUsage: "<FILE>",
+			Flags: []ucli.Flag{
+				&ucli.IntFlag{Name: "time-tolerance", Usage: "Time tolerance in ms", Value: 0},
+				&ucli.BoolFlag{Name: "ignore-html", Usage: "Ignore HTML tags when comparing text"},
+				&ucli.BoolFlag{Name: "dry-run", Usage: "Preview changes without modifying the file"},
+			},
+			Action: func(_ context.Context, c *ucli.Command) error {
+				format := resolveOutputFormat(c)
+				file := c.Args().Get(0)
+				return cmd.HandleDedupe(file, int64(c.Int("time-tolerance")), c.Bool("ignore-html"), c.Bool("dry-run"), format)
 			},
 		},
 		// Describe available commands and their schemas (always JSON)
