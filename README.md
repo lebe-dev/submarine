@@ -51,6 +51,12 @@ cleaning up — with copy-paste commands and expected output. Full index —
 - [Merge an incomplete translation with a donor file](docs/usecases/merge-incomplete-translation-with-donor.md)
 - [Detect and fix a constant sync offset](docs/usecases/detect-and-fix-constant-offset.md)
 - [Fix frame-rate drift (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.md)
+- [Re-sync only part of a file](docs/usecases/resync-a-partial-range.md)
+- [Join split parts (CD1/CD2) into one file](docs/usecases/join-split-parts-cd1-cd2.md)
+- [Compare two subtitle tracks](docs/usecases/compare-two-subtitle-tracks.md)
+- [Normalize structure: sort, renumber, fix overlaps](docs/usecases/normalize-structure.md)
+- [Remove duplicates and overlaps after merging](docs/usecases/deduplicate-and-clean-after-merge.md)
+- [Find missing dialogue with gap analysis](docs/usecases/find-missing-dialogue-gaps.md)
 
 ## How to use as library
 

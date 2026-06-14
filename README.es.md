@@ -51,6 +51,12 @@ y limpieza — con comandos listos para copiar y salida esperada. Índice comple
 - [Fusionar una traducción incompleta con un archivo donante](docs/usecases/merge-incomplete-translation-with-donor.es.md)
 - [Detectar y corregir un desplazamiento de sincronía constante](docs/usecases/detect-and-fix-constant-offset.es.md)
 - [Corregir la deriva de velocidad de fotogramas (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.es.md)
+- [Resincronizar solo una parte del archivo](docs/usecases/resync-a-partial-range.es.md)
+- [Unir partes divididas (CD1/CD2) en un solo archivo](docs/usecases/join-split-parts-cd1-cd2.es.md)
+- [Comparar dos pistas de subtítulos](docs/usecases/compare-two-subtitle-tracks.es.md)
+- [Normalizar la estructura: ordenar, renumerar, corregir solapamientos](docs/usecases/normalize-structure.es.md)
+- [Eliminar duplicados y solapamientos tras una fusión](docs/usecases/deduplicate-and-clean-after-merge.es.md)
+- [Encontrar diálogos faltantes con análisis de huecos](docs/usecases/find-missing-dialogue-gaps.es.md)
 
 ## Uso como biblioteca
 

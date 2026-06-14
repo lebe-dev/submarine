@@ -51,6 +51,12 @@ macOS (Homebrew), Linux, Docker — см. [docs/install/](docs/install/README.ru
 - [Слияние неполного перевода с донором](docs/usecases/merge-incomplete-translation-with-donor.ru.md)
 - [Определение и исправление постоянного смещения синхронизации](docs/usecases/detect-and-fix-constant-offset.ru.md)
 - [Исправление дрейфа частоты кадров (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.ru.md)
+- [Ресинхронизация только части файла](docs/usecases/resync-a-partial-range.ru.md)
+- [Склейка частей (CD1/CD2) в один файл](docs/usecases/join-split-parts-cd1-cd2.ru.md)
+- [Сравнение двух дорожек субтитров](docs/usecases/compare-two-subtitle-tracks.ru.md)
+- [Нормализация структуры: сортировка, перенумерация, исправление перекрытий](docs/usecases/normalize-structure.ru.md)
+- [Удаление дублей и перекрытий после объединения](docs/usecases/deduplicate-and-clean-after-merge.ru.md)
+- [Поиск пропущенного диалога через анализ пауз](docs/usecases/find-missing-dialogue-gaps.ru.md)
 
 ## Использование библиотеки
 
