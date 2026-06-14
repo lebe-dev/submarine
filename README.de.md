@@ -202,6 +202,16 @@ $ sm describe
 $ sm describe get
 ```
 
+## Anwendungsfälle
+
+Aufgabenorientierte Rezepte für häufige Untertitelprobleme — Synchronisierung, Zusammenführen,
+Vergleichen und Bereinigen — mit kopierfertigen Befehlen und erwartetem Ausgabe. Den vollständigen
+Index finden Sie unter [docs/usecases/](docs/usecases/README.de.md), darunter:
+
+- [Unvollständige Übersetzung mit einer Spenderdatei zusammenführen](docs/usecases/merge-incomplete-translation-with-donor.de.md)
+- [Konstanten Sync-Versatz erkennen und beheben](docs/usecases/detect-and-fix-constant-offset.de.md)
+- [Bildfrequenz-Drift korrigieren (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.de.md)
+
 ## Als Bibliothek verwenden
 
 Neben der Befehlszeilenschnittstelle kann Submarine als Bibliothek in eigenen Rust-Projekten verwendet werden. Weitere Informationen zur Integration finden Sie in der [Bibliotheksdokumentation](docs/LIBRARY.md).

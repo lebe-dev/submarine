@@ -202,6 +202,16 @@ $ sm describe
 $ sm describe get
 ```
 
+## Casos de uso
+
+Recetas orientadas a tareas para problemas reales con subtítulos — sincronización, fusión, comparación
+y limpieza — con comandos listos para copiar y salida esperada. Consulte el índice completo en
+[docs/usecases/](docs/usecases/README.es.md), incluyendo:
+
+- [Fusionar una traducción incompleta con un archivo donante](docs/usecases/merge-incomplete-translation-with-donor.es.md)
+- [Detectar y corregir un desplazamiento de sincronía constante](docs/usecases/detect-and-fix-constant-offset.es.md)
+- [Corregir la deriva de velocidad de fotogramas (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.es.md)
+
 ## Uso como biblioteca
 
 Además de la interfaz de línea de comandos, Submarine puede usarse como biblioteca en proyectos Rust propios. Para más detalles sobre la integración, consulte la [documentación de la biblioteca](docs/LIBRARY.md).
