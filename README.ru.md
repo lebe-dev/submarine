@@ -16,8 +16,8 @@ Submarine помогает в процессе перевода, предост�
 
 - Формат субтитров: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
 - Поддерживаемые сценарии работы:
-  - Агент: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md), [De](docs/AGENT-TRANSLATION-FLOW.DE.md), [Es](docs/AGENT-TRANSLATION-FLOW.ES.md)
-  - Чат-бот: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md), [De](docs/CHATBOT-TRANSLATION-FLOW.DE.md), [Es](docs/CHATBOT-TRANSLATION-FLOW.ES.md)
+  - Агент: [docs/AGENT-TRANSLATION-FLOW.RU.md](docs/AGENT-TRANSLATION-FLOW.RU.md)
+  - Чат-бот: [docs/CHATBOT-TRANSLATION-FLOW.RU.md](docs/CHATBOT-TRANSLATION-FLOW.RU.md)
 - **Инструменты:**
   - Получить субтитр по индексу или диапазону
   - Добавить новый субтитр

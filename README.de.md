@@ -16,8 +16,8 @@ Submarine unterstützt den Übersetzungsprozess durch verschiedene Bearbeitungs-
 
 - Untertitelformat: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
 - Unterstützte Workflows:
-  - Agent: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md), [De](docs/AGENT-TRANSLATION-FLOW.DE.md), [Es](docs/AGENT-TRANSLATION-FLOW.ES.md)
-  - Chatbot: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md), [De](docs/CHATBOT-TRANSLATION-FLOW.DE.md), [Es](docs/CHATBOT-TRANSLATION-FLOW.ES.md)
+  - Agent: [docs/AGENT-TRANSLATION-FLOW.DE.md](docs/AGENT-TRANSLATION-FLOW.DE.md)
+  - Chatbot: [docs/CHATBOT-TRANSLATION-FLOW.DE.md](docs/CHATBOT-TRANSLATION-FLOW.DE.md)
 - **Werkzeuge:**
   - Untertitel nach Index oder Bereich abrufen
   - Neuen Untertitel hinzufügen

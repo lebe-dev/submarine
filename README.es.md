@@ -16,8 +16,8 @@ Submarine está diseñado para ayudar en el proceso de traducción con herramien
 
 - Formato de subtítulos: [SubRip](https://en.wikipedia.org/wiki/SubRip) (srt)
 - Flujos de trabajo compatibles:
-  - Agente: [Eng](docs/AGENT-TRANSLATION-FLOW.md), [Rus](docs/AGENT-TRANSLATION-FLOW.RU.md), [De](docs/AGENT-TRANSLATION-FLOW.DE.md), [Es](docs/AGENT-TRANSLATION-FLOW.ES.md)
-  - Chatbot: [Eng](docs/CHATBOT-TRANSLATION-FLOW.md), [Rus](docs/CHATBOT-TRANSLATION-FLOW.RU.md), [De](docs/CHATBOT-TRANSLATION-FLOW.DE.md), [Es](docs/CHATBOT-TRANSLATION-FLOW.ES.md)
+  - Agente: [docs/AGENT-TRANSLATION-FLOW.ES.md](docs/AGENT-TRANSLATION-FLOW.ES.md)
+  - Chatbot: [docs/CHATBOT-TRANSLATION-FLOW.ES.md](docs/CHATBOT-TRANSLATION-FLOW.ES.md)
 - **Herramientas:**
   - Obtener subtítulo por índice o rango
   - Añadir un nuevo subtítulo
