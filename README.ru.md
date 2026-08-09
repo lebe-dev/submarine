@@ -48,15 +48,18 @@ macOS (Homebrew), Linux, Docker — см. [docs/install/](docs/install/README.ru
 очистка — с готовыми командами и ожидаемым выводом. Полный индекс —
 [docs/usecases/](docs/usecases/README.ru.md), включая:
 
-- [Слияние неполного перевода с донором](docs/usecases/merge-incomplete-translation-with-donor.ru.md)
-- [Определение и исправление постоянного смещения синхронизации](docs/usecases/detect-and-fix-constant-offset.ru.md)
-- [Исправление дрейфа частоты кадров (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.ru.md)
-- [Ресинхронизация только части файла](docs/usecases/resync-a-partial-range.ru.md)
-- [Склейка частей (CD1/CD2) в один файл](docs/usecases/join-split-parts-cd1-cd2.ru.md)
-- [Сравнение двух дорожек субтитров](docs/usecases/compare-two-subtitle-tracks.ru.md)
-- [Нормализация структуры: сортировка, перенумерация, исправление перекрытий](docs/usecases/normalize-structure.ru.md)
-- [Удаление дублей и перекрытий после объединения](docs/usecases/deduplicate-and-clean-after-merge.ru.md)
-- [Поиск пропущенного диалога через анализ пауз](docs/usecases/find-missing-dialogue-gaps.ru.md)
+- Статья: [How I Translate Subtitles with LLMs](https://lebe-dev.github.io/en/blog/how-i-translate-subtitles-with-llm/)
+- Статья: [How I Translate Podcasts with LLMs](https://lebe-dev.github.io/en/blog/how-i-translate-podcasts-with-llm/)
+- Статья: [Creating Subtitles from a Dubbed Track](https://lebe-dev.github.io/en/blog/creating-subtitles-from-a-dubbed-track/)
+- Руководство: [Слияние неполного перевода с донором](docs/usecases/merge-incomplete-translation-with-donor.ru.md)
+- Руководство: [Определение и исправление постоянного смещения синхронизации](docs/usecases/detect-and-fix-constant-offset.ru.md)
+- Руководство: [Исправление дрейфа частоты кадров (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.ru.md)
+- Руководство: [Ресинхронизация только части файла](docs/usecases/resync-a-partial-range.ru.md)
+- Руководство: [Склейка частей (CD1/CD2) в один файл](docs/usecases/join-split-parts-cd1-cd2.ru.md)
+- Руководство: [Сравнение двух дорожек субтитров](docs/usecases/compare-two-subtitle-tracks.ru.md)
+- Руководство: [Нормализация структуры: сортировка, перенумерация, исправление перекрытий](docs/usecases/normalize-structure.ru.md)
+- Руководство: [Удаление дублей и перекрытий после объединения](docs/usecases/deduplicate-and-clean-after-merge.ru.md)
+- Руководство: [Поиск пропущенного диалога через анализ пауз](docs/usecases/find-missing-dialogue-gaps.ru.md)
 
 ## Использование библиотеки
 

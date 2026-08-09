@@ -48,15 +48,18 @@ Aufgabenorientierte Rezepte für häufige Untertitelprobleme — Synchronisierun
 Vergleichen und Bereinigen — mit kopierfertigen Befehlen und erwartetem Ausgabe. Vollständiger Index —
 [docs/usecases/](docs/usecases/README.de.md), darunter:
 
-- [Unvollständige Übersetzung mit einer Spenderdatei zusammenführen](docs/usecases/merge-incomplete-translation-with-donor.de.md)
-- [Konstanten Sync-Versatz erkennen und beheben](docs/usecases/detect-and-fix-constant-offset.de.md)
-- [Bildfrequenz-Drift korrigieren (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.de.md)
-- [Nur einen Teil einer Datei neu synchronisieren](docs/usecases/resync-a-partial-range.de.md)
-- [Geteilte Teile (CD1/CD2) in eine Datei zusammenfügen](docs/usecases/join-split-parts-cd1-cd2.de.md)
-- [Zwei Untertitelspuren vergleichen](docs/usecases/compare-two-subtitle-tracks.de.md)
-- [Struktur normalisieren: sortieren, umnummerieren, Überlappungen beheben](docs/usecases/normalize-structure.de.md)
-- [Duplikate und Überlappungen nach dem Zusammenführen entfernen](docs/usecases/deduplicate-and-clean-after-merge.de.md)
-- [Fehlende Dialoge mit Lückenanalyse finden](docs/usecases/find-missing-dialogue-gaps.de.md)
+- Artikel: [How I Translate Subtitles with LLMs](https://lebe-dev.github.io/en/blog/how-i-translate-subtitles-with-llm/)
+- Artikel: [How I Translate Podcasts with LLMs](https://lebe-dev.github.io/en/blog/how-i-translate-podcasts-with-llm/)
+- Artikel: [Creating Subtitles from a Dubbed Track](https://lebe-dev.github.io/en/blog/creating-subtitles-from-a-dubbed-track/)
+- Anleitung: [Unvollständige Übersetzung mit einer Spenderdatei zusammenführen](docs/usecases/merge-incomplete-translation-with-donor.de.md)
+- Anleitung: [Konstanten Sync-Versatz erkennen und beheben](docs/usecases/detect-and-fix-constant-offset.de.md)
+- Anleitung: [Bildfrequenz-Drift korrigieren (23.976 ↔ 25)](docs/usecases/fix-framerate-drift-with-rescale.de.md)
+- Anleitung: [Nur einen Teil einer Datei neu synchronisieren](docs/usecases/resync-a-partial-range.de.md)
+- Anleitung: [Geteilte Teile (CD1/CD2) in eine Datei zusammenfügen](docs/usecases/join-split-parts-cd1-cd2.de.md)
+- Anleitung: [Zwei Untertitelspuren vergleichen](docs/usecases/compare-two-subtitle-tracks.de.md)
+- Anleitung: [Struktur normalisieren: sortieren, umnummerieren, Überlappungen beheben](docs/usecases/normalize-structure.de.md)
+- Anleitung: [Duplikate und Überlappungen nach dem Zusammenführen entfernen](docs/usecases/deduplicate-and-clean-after-merge.de.md)
+- Anleitung: [Fehlende Dialoge mit Lückenanalyse finden](docs/usecases/find-missing-dialogue-gaps.de.md)
 
 ## Als Bibliothek verwenden
 
